@@ -1,25 +1,51 @@
 schema_version: 1
-last_reviewed: "2026-05-09"
+last_reviewed: "2026-05-10"
 last_reviewed_by: human
+# v2 strategy set after the 2026-05-10 pivot.
+# Old sector-rotation strategies are kept here marked REJECTED so their failure
+# is preserved in the audit log. They are not eligible for routine execution.
 allowed_strategies:
-  - name: sector_relative_strength_rotation
-    status: ACTIVE_PAPER_TEST
-    description: >-
-      Overweight sector ETFs with strongest 20d/60d relative strength vs SPY in a confirmed
-      up-regime; underweight or skip those with deteriorating RS.
-  - name: regime_defensive_tilt
-    status: ACTIVE_PAPER_TEST
-    description: >-
-      In high-volatility / risk-off regime (VIX > 22 or breadth deterioration), tilt toward
-      XLP/XLU/XLV; reduce XLK/XLY/XLC exposure.
-  - name: trend_pullback_in_leader
+  # ----- Active v1 strategies (multi-strategy retail portfolio) -----
+  - name: dual_momentum_taa
     status: NEEDS_MORE_DATA
     description: >-
-      Pullback to 20DMA on the leading sector ETF, in a confirmed market uptrend.
-  - name: spy_neutral_default
-    status: ACTIVE_PAPER_TEST
+      Trend-following + cross-asset momentum across SPY/TLT/GLD with SHV as cash floor.
+      Hold the single best-momentum asset that also clears its 10-month MA; otherwise
+      hold cash. ~4-8 trades per year. Capital allocation: 60% of portfolio.
+  - name: large_cap_momentum_top5
+    status: NEEDS_MORE_DATA
     description: >-
-      When no sector edge is detected, hold SPY as the do-no-harm default rather than overtrading.
+      Hold top-5 large-caps by 6-month total return, equal-weighted, when SPY is above
+      its 10-month MA. Exit when stock falls out of top-7 OR SPY trend breaks.
+      Capital allocation: 30% of portfolio.
+  - name: gold_permanent_overlay
+    status: NEEDS_MORE_DATA
+    description: >-
+      Permanent 10% allocation to GLD. Crisis/inflation insurance and a diversifier
+      that historically has near-zero correlation to both equities and bonds.
+
+  # ----- Rejected strategies (kept for audit; not eligible for execution) -----
+  - name: sector_relative_strength_rotation
+    status: REJECTED
+    description: >-
+      REJECTED 2026-05-10. Lost to SPY by 50-78% across 2010-2015, 2019-2020,
+      and 2022-2026 backtests. See reports/learning/backtest_findings_2026-05-10.md.
+  - name: regime_defensive_tilt
+    status: REJECTED
+    description: >-
+      REJECTED 2026-05-10. Failed both SPY and equal-weight benchmarks in the
+      2022-2026 backtest.
+  - name: trend_pullback_in_leader
+    status: REJECTED
+    description: >-
+      REJECTED 2026-05-10. Never backtested in isolation; structural problem
+      identified in the broader rotation family.
+  - name: spy_neutral_default
+    status: REJECTED
+    description: >-
+      REJECTED 2026-05-10. The "hold SPY when no edge" default is subsumed by
+      dual_momentum_taa, which can hold SPY as a risk-on asset when warranted.
+
 disallowed_strategies:
   - day_trading_scalp
   - news_chase
@@ -28,21 +54,19 @@ disallowed_strategies:
   - inverse_or_leveraged_etf_use
   - options_strategies
   - short_selling
+
 required_confirmations:
-  sector_relative_strength_rotation:
-    - "Up-regime confirmed (SPY > 50DMA AND breadth positive)"
-    - "Sector RS rank top-3 vs SPY on both 20d AND 60d windows"
-    - "Sector ETF above its own 50DMA"
-  regime_defensive_tilt:
-    - "VIX > 22 OR SPY < 50DMA OR sector breadth turning negative"
-    - "Defensive sector RS improving vs SPY over 10d"
-  trend_pullback_in_leader:
-    - "ETF in top-3 sector RS"
-    - "Pullback within 2-3% of 20DMA"
-    - "RSI between 40-55"
-  spy_neutral_default:
-    - "No sector ETF passes any of the above criteria"
-minimum_risk_reward_ratio: 2.0
+  dual_momentum_taa:
+    - "Risk asset's 12-month total return exceeds SHV's 12-month total return"
+    - "Risk asset above its 10-month moving average"
+    - "Selected as top-1 (or top-N by params) among qualifying risk assets"
+  large_cap_momentum_top5:
+    - "SPY above its 10-month moving average (trend filter)"
+    - "Stock in top-5 by 6-month total return on the watchlist large-cap subset"
+  gold_permanent_overlay:
+    - "Permanent allocation policy — no per-period confirmations required"
+
+minimum_risk_reward_ratio: 1.5
 minimum_liquidity_avg_daily_volume: 5000000
 abnormal_volatility_threshold_atr_multiplier: 2.5
 holding_earnings_caution_window_days: 1

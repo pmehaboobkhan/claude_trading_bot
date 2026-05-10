@@ -9,15 +9,17 @@ limits:
   max_daily_loss_pct: 0.5
   max_weekly_loss_pct: 2.0
   max_monthly_loss_pct: 5.0
-  max_position_size_pct: 25.0
-  max_total_equity_exposure_pct: 95.0
-  max_tech_correlated_pct: 40.0       # combined XLK + XLY + XLC cap
-  max_defensive_correlated_pct: 40.0  # combined XLP + XLU + XLV cap
-  max_trades_per_day: 4
-  max_open_positions: 5
-  default_stop_loss_pct: 4.0
-  default_take_profit_pct: 8.0
-  minimum_risk_reward: 2.0
+  max_drawdown_pct: 15.0                  # hard cap matching the 15% drawdown target
+  max_position_size_pct: 15.0             # cap per individual position; Strategy B holds 5 at ~6% each
+  max_macro_etf_position_pct: 60.0        # SPY/TLT/GLD can each take up to 60% (Strategy A)
+  max_total_equity_exposure_pct: 100.0    # fully invested is fine in multi-strategy
+  max_risk_per_trade_pct: 1.5             # day-trader-style risk budget per opened position
+  daily_drawdown_halt_pct: 2.0            # stop trading when daily P&L hits -2%
+  max_trades_per_day: 5                   # rotation + rebalance; few trades, not a scalper
+  max_open_positions: 8                   # Strategy A (1) + B (5) + C (1) + buffer
+  default_stop_loss_pct: 10.0             # B uses per-position stops at -10%
+  default_take_profit_pct: 25.0           # generous; rotation handles upside on Strategy A
+  minimum_risk_reward: 1.5                # softer than before — momentum doesn't always need 2:1
 permissions:
   allow_margin: false
   allow_options: false

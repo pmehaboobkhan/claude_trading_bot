@@ -114,7 +114,8 @@ def run_backtest(*, strategy: str,
                  end_date: str,
                  initial_capital: float = 100_000.0,
                  max_position_size_pct: float = 25.0,
-                 fill_model: FillModel | None = None) -> BacktestResult:
+                 fill_model: FillModel | None = None,
+                 strategy_params: dict[str, dict] | None = None) -> BacktestResult:
     """Run an event-driven backtest of a single named strategy.
 
     `bars_by_symbol` must contain bars for SPY, all watchlist symbols, and (optionally)
@@ -156,6 +157,7 @@ def run_backtest(*, strategy: str,
         regime = signals.detect_regime(slice_by_symbol["SPY"], vix_value)
         all_signals = signals.evaluate_all(
             slice_by_symbol, watchlist_symbols, regime, strategy_rules,
+            strategy_params=strategy_params,
         )
         # Filter to the strategy under test.
         my_signals = [s for s in all_signals if s.strategy == strategy]
@@ -315,12 +317,17 @@ def write_report(result: BacktestResult, *, output_dir: str | Path) -> Path:
         "## Sample size guardrails",
         f"- Trades: {total_exits}. {'OK for evaluation' if total_exits >= 30 else 'PRELIMINARY — N < 30 trades.'}",
         "",
-        "## Promotion criteria",
+        "## Promotion criteria (tightened 2026-05-10 — must beat SPY, not just equal-weight)",
         "Strategy may advance from NEEDS_MORE_DATA → ACTIVE_PAPER_TEST only if **all** hold:",
-        f"- Total return ≥ equal-weight benchmark: {(result.total_return_pct >= (ew_return or 0)) if ew_return is not None else '(n/a)'}",
+        f"- Total return ≥ SPY total return (primary bar): {(result.total_return_pct >= (spy_return or 0)) if spy_return is not None else '(n/a)'}",
+        f"- Total return ≥ equal-weight benchmark (trading-adds-value test): {(result.total_return_pct >= (ew_return or 0)) if ew_return is not None else '(n/a)'}",
         f"- Max drawdown ≤ SPY's max drawdown: {(mdd <= (spy_mdd or 0)) if spy_mdd is not None else '(n/a)'}",
         f"- N trades ≥ 30: {total_exits >= 30}",
         f"- Sharpe > 0: {sharpe > 0}",
+        "",
+        "**Rationale for the SPY bar**: the goal in `CLAUDE.md` is risk-adjusted outperformance vs SPY.",
+        "Beating only equal-weight sectors is necessary but not sufficient — equal-weight has historically",
+        "underperformed cap-weighted SPY in tech-led regimes, so 'beats EW' is a low bar.",
         "",
         "## Trades",
         "| Date | Symbol | Side | Qty | Price | PnL | Rationale |",

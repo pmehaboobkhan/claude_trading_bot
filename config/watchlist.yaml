@@ -1,104 +1,214 @@
 schema_version: 1
-last_reviewed: "2026-05-09"
+last_reviewed: "2026-05-10"
 last_reviewed_by: human
-universe: sector_etf_rotation
+universe: multi_strategy_retail_portfolio
 benchmarks:
-  primary: SPY
-  secondary: SECTOR_EW
+  primary: ABSOLUTE_RETURN_TARGET   # 8-10% annual, max DD <= 15%
+  secondary: SPY                    # reported for context, not used as a hurdle
 symbols:
+  # --------- Strategy A: dual_momentum_taa universe (macro ETFs) ---------
   - symbol: SPY
     company_name: SPDR S&P 500 ETF Trust
-    sector: Benchmark
+    sector: Equity_BroadMarket
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
-    max_position_size_pct: 30
-    notes: "Benchmark + neutral position. When no clear sector edge is detected, holding SPY is the do-no-harm default."
-  - symbol: XLK
-    company_name: Technology Select Sector SPDR Fund
+    max_position_size_pct: 60
+    notes: "Macro ETF: broad US equity. Used by dual_momentum_taa + as trend filter for large_cap_momentum_top5."
+  - symbol: IEF
+    company_name: iShares 7-10 Year Treasury Bond ETF
+    sector: Fixed_Income_IntermediateDuration
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 60
+    notes: "Macro ETF: intermediate-duration bonds (swapped from TLT 2026-05-10 to reduce DD in rate-hike cycles). Used by dual_momentum_taa."
+  - symbol: TLT
+    company_name: iShares 20+ Year Treasury Bond ETF
+    sector: Fixed_Income_LongDuration
+    approved_for_research: true
+    approved_for_paper_trading: false
+    approved_for_live_trading: false
+    max_position_size_pct: 60
+    notes: "Kept on watchlist for reference; replaced by IEF in TAA after 2022 rate-hike cycle showed TLT contributed too much to portfolio DD."
+  - symbol: GLD
+    company_name: SPDR Gold Shares
+    sector: Commodity_Gold
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 60
+    notes: "Macro ETF: gold. Used by dual_momentum_taa AND gold_permanent_overlay (10% permanent)."
+  - symbol: SHV
+    company_name: iShares Short Treasury Bond ETF
+    sector: Cash_Equivalent
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 100
+    notes: "Cash floor for dual_momentum_taa. Holds when no risk asset clears momentum + MA filters."
+
+  # --------- Strategy B: large_cap_momentum_top5 universe (~20 large-caps) ---------
+  # Curated for: market cap >= $100B at scaffold time, >=20y of price history,
+  # diversified across sectors. Stocks are eligible because they appear in
+  # watchlist + are NOT in the macro ETF set; signals.py filters automatically.
+  - symbol: AAPL
+    company_name: Apple Inc.
     sector: Technology
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
-    max_position_size_pct: 25
-    notes: "Largest SPX sector. Heavily AAPL/MSFT/NVDA-driven; tech leadership = SPX leadership."
-  - symbol: XLF
-    company_name: Financial Select Sector SPDR Fund
+    max_position_size_pct: 15
+    notes: "Mag-7. Momentum universe."
+  - symbol: MSFT
+    company_name: Microsoft Corporation
+    sector: Technology
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Mag-7. Momentum universe."
+  - symbol: GOOGL
+    company_name: Alphabet Inc. Class A
+    sector: Communication_Services
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Mag-7. Momentum universe. IPO 2004."
+  - symbol: AMZN
+    company_name: Amazon.com Inc.
+    sector: Consumer_Discretionary
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Mag-7. Momentum universe."
+  - symbol: NVDA
+    company_name: NVIDIA Corporation
+    sector: Technology
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Highest beta in basket. Momentum universe."
+  - symbol: META
+    company_name: Meta Platforms Inc.
+    sector: Communication_Services
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Mag-7. Momentum universe. IPO 2012 — limited pre-2012 history."
+  - symbol: TSLA
+    company_name: Tesla Inc.
+    sector: Consumer_Discretionary
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 10
+    notes: "High idiosyncratic risk; tighter cap. IPO 2010."
+  - symbol: JPM
+    company_name: JPMorgan Chase & Co.
     sector: Financials
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Sensitive to rates and yield curve. Watch FOMC, 2y/10y spread, bank stress signals."
-  - symbol: XLE
-    company_name: Energy Select Sector SPDR Fund
+    max_position_size_pct: 15
+    notes: "Megabank. Momentum universe."
+  - symbol: BAC
+    company_name: Bank of America Corp
+    sector: Financials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Megabank. Momentum universe."
+  - symbol: V
+    company_name: Visa Inc.
+    sector: Financials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Payments. IPO 2008."
+  - symbol: MA
+    company_name: Mastercard Inc.
+    sector: Financials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Payments. IPO 2006."
+  - symbol: JNJ
+    company_name: Johnson & Johnson
+    sector: Health_Care
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Mega healthcare. Defensive."
+  - symbol: UNH
+    company_name: UnitedHealth Group
+    sector: Health_Care
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Insurance + healthcare services."
+  - symbol: PFE
+    company_name: Pfizer Inc.
+    sector: Health_Care
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Pharma."
+  - symbol: WMT
+    company_name: Walmart Inc.
+    sector: Consumer_Staples
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Defensive retail."
+  - symbol: COST
+    company_name: Costco Wholesale
+    sector: Consumer_Staples
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Defensive retail."
+  - symbol: HD
+    company_name: Home Depot Inc.
+    sector: Consumer_Discretionary
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Cyclical retail."
+  - symbol: XOM
+    company_name: Exxon Mobil Corporation
     sector: Energy
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
     max_position_size_pct: 15
-    notes: "Driven by crude oil and geopolitics. Often anticorrelated with broad market."
-  - symbol: XLV
-    company_name: Health Care Select Sector SPDR Fund
-    sector: Health Care
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Defensive sector. Watch policy/regulatory headlines."
-  - symbol: XLY
-    company_name: Consumer Discretionary Select Sector SPDR Fund
-    sector: Consumer Discretionary
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Heavily AMZN/TSLA-weighted. Risk-on cyclical. Watch retail sales and consumer confidence."
-  - symbol: XLP
-    company_name: Consumer Staples Select Sector SPDR Fund
-    sector: Consumer Staples
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Defensive. Outperforms in risk-off / late-cycle regimes."
-  - symbol: XLI
-    company_name: Industrial Select Sector SPDR Fund
-    sector: Industrials
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Cyclical. Watch ISM PMI, capex cycle, transports."
-  - symbol: XLB
-    company_name: Materials Select Sector SPDR Fund
-    sector: Materials
+    notes: "Energy major; commodity exposure."
+  - symbol: ORCL
+    company_name: Oracle Corporation
+    sector: Technology
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
     max_position_size_pct: 15
-    notes: "Cyclical. Watch commodity prices, USD, China demand."
-  - symbol: XLRE
-    company_name: Real Estate Select Sector SPDR Fund
-    sector: Real Estate
+    notes: "Enterprise software."
+  - symbol: CSCO
+    company_name: Cisco Systems
+    sector: Technology
     approved_for_research: true
     approved_for_paper_trading: true
     approved_for_live_trading: false
     max_position_size_pct: 15
-    notes: "Highly rate-sensitive. Inverse to long yields."
-  - symbol: XLU
-    company_name: Utilities Select Sector SPDR Fund
-    sector: Utilities
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 15
-    notes: "Defensive, rate-sensitive (bond proxy). Outperforms in flight-to-quality."
-  - symbol: XLC
-    company_name: Communication Services Select Sector SPDR Fund
-    sector: Communication Services
-    approved_for_research: true
-    approved_for_paper_trading: true
-    approved_for_live_trading: false
-    max_position_size_pct: 20
-    notes: "Heavily META/GOOGL-weighted; behaves more like tech than telecom."
+    notes: "Networking. Legacy tech."

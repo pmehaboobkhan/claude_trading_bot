@@ -4,12 +4,23 @@
 
 ## Project purpose
 
-This repository runs a Claude-native research and paper-trading workflow for a 12-symbol U.S. sector-ETF universe. The goal is **risk-adjusted outperformance vs SPY** (Sharpe with max drawdown ≤ SPY's), measured against:
+This repository runs a Claude-native research and paper-trading workflow for a multi-strategy retail portfolio.
 
-1. **SPY** (the stated risk-adjusted target).
-2. **Equal-weight buy-and-hold of the 11 sector ETFs** (the "is the trading itself adding value?" test).
+**Goal (revised 2026-05-10):** **8-10% annualized compound return with maximum drawdown ≤ 15%, Sharpe ratio ≥ 0.8.** This is an *absolute return target*, not a relative benchmark — the system aims to make money reliably, not to beat any specific index.
 
-It is **not** a guaranteed-income system. Markets are risky; losses are possible.
+The portfolio combines three uncorrelated strategies:
+
+1. **`dual_momentum_taa` (60% of capital)** — trend-following across SPY / TLT / GLD with SHV cash floor.
+2. **`large_cap_momentum_top5` (30%)** — top-5 large-cap stocks by 6-month return, with SPY trend filter.
+3. **`gold_permanent_overlay` (10%)** — permanent GLD allocation as diversifier and crisis hedge.
+
+SPY return is reported alongside for context but is NOT a hurdle the system has to clear.
+
+It is **not** a guaranteed-income system. Markets are risky; losses are possible. Even hedge funds with multi-strategy diversification have down quarters.
+
+## History
+
+This project began with a sector-ETF rotation thesis that was rejected by backtest evidence across three regimes (see `reports/learning/backtest_findings_2026-05-10.md`). The pivot to multi-strategy retail portfolio happened the same day. The deterministic backtest infrastructure paid for itself by killing a bad strategy before any money was at risk.
 
 ## Operating modes
 
@@ -129,13 +140,23 @@ Adding a new symbol to the watchlist → human only (Self-Learning Agent may **p
 
 ## Performance tracking (every weekly and monthly review)
 
-- Period return (paper portfolio) vs **SPY** total return.
-- Period return vs **equal-weight buy-and-hold of the 11 sector ETFs**.
-- Alpha vs each benchmark.
-- Sharpe ratio (or simplified return / volatility for short windows).
-- Max drawdown vs SPY's max drawdown.
-- Beta to SPY.
-- Information ratio.
-- Confidence calibration: predicted-confidence buckets vs realized hit rate.
+Tracked against the absolute targets, not against SPY:
 
-If the system fails either benchmark on a 3-month rolling basis, the monthly review must recommend `STAY_PAPER` or `HALT_AND_REVIEW`. Live trading does not unlock until both benchmarks are beaten on a 6-month risk-adjusted basis.
+- **Annualized return so far** vs the 8-10% target band.
+- **Max drawdown** vs the 15% cap.
+- **Sharpe ratio** (when N ≥ 30 trades or 90+ trading days).
+- **Per-strategy attribution**: A vs B vs C, so we know which is pulling weight.
+- **SPY return** reported alongside for context only.
+- **Confidence calibration**: predicted-confidence buckets vs realized hit rate.
+
+**Halt triggers (monthly review must recommend `STAY_PAPER` or `HALT_AND_REVIEW` if any hold):**
+- Drawdown breaches 12% (we want to act before hitting the 15% hard cap).
+- 3-month rolling return is negative.
+- Any individual strategy's drawdown breaches 25% on its allocated capital.
+
+**Live-trading unlock criteria (not active in v1):**
+- 90+ trading days of paper operation.
+- 30+ closed paper trades across all strategies.
+- Portfolio Sharpe ratio ≥ 0.8 on paper data.
+- Max drawdown ≤ 12% on paper data.
+- Explicit human PR + signed update to `docs/risk_profile.md`.
