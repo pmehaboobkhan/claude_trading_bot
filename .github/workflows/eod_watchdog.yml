@@ -1,0 +1,75 @@
+name: EOD watchdog
+
+# Runs after the Claude Code end-of-day routine should have committed.
+# If no commit landed on today's date by 17:30 ET, send a Telegram alert.
+# This is the safety net for "what if Claude Code routines silently miss?"
+on:
+  schedule:
+    # 21:30 UTC Mon-Fri ≈ 17:30 ET / 16:30 EST (close enough; trading-day check below filters).
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  check_eod_commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Determine "today" in ET and check trading-day
+        id: today
+        run: |
+          today=$(TZ="America/New_York" date +%Y-%m-%d)
+          dow=$(TZ="America/New_York" date +%u)   # 1..7, Mon..Sun
+          echo "today=$today" >> "$GITHUB_OUTPUT"
+          echo "dow=$dow" >> "$GITHUB_OUTPUT"
+          if [ "$dow" -ge 6 ]; then
+            echo "weekend — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          # Crude US market-holiday check: skip if a known no-trade date.
+          # Keep this list small; refresh annually.
+          case "$today" in
+            *-01-01|*-07-04|*-12-25)
+              echo "fixed holiday — skipping"; echo "skip=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Look for an EOD commit landed today
+        if: steps.today.outputs.skip != 'true'
+        id: check
+        run: |
+          today="${{ steps.today.outputs.today }}"
+          # An EOD commit either has subject prefix "eod:" or touches journals/daily/<today>.md.
+          found=""
+          if git log --since="$today 00:00 -04:00" --until="$today 23:59 -04:00" \
+                  --pretty='%s' | grep -E '^eod:' > /dev/null; then
+            found="commit-subject"
+          elif git log --since="$today 00:00 -04:00" --until="$today 23:59 -04:00" \
+                  --name-only --pretty=format: \
+                | grep -E "journals/daily/${today}\\.md" > /dev/null; then
+            found="journal-write"
+          fi
+          if [ -z "$found" ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+            echo "found via: $found"
+          fi
+
+      - name: Notify Telegram if EOD missing
+        if: steps.today.outputs.skip != 'true' && steps.check.outputs.missing == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "no telegram secrets configured; nothing to send" >&2
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"URGENT [Calm Turtle watchdog]\\nEOD commit MISSING for ${{ steps.today.outputs.today }}. Run the end-of-day routine manually and investigate logs/routine_runs/.\"}"

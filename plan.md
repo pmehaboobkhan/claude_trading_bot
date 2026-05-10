@@ -2,6 +2,23 @@
 
 > Codename: **Calm Turtle**. Slow, deliberate, defensive. Capital preservation > clever trades.
 
+## Post-Review Refactor (2026-05-10)
+
+After an external architecture review, v1 was significantly tightened. Key changes:
+
+1. **Decisions are deterministic, not LLM-generated.** `lib/signals.py` evaluates `strategy_rules.yaml > required_confirmations` and emits `ENTRY` / `EXIT` / `NO_SIGNAL`. Claude's `trade_proposal` agent wraps signals with thesis/context/R/R but never overrides the action. Backtests are now possible because signals are reproducible.
+2. **Backtest harness is a prerequisite, not Phase 5.** `lib/backtest.py` runs event-driven backtests against historical bars; a strategy may not advance to `ACTIVE_PAPER_TEST` until its backtest report meets the promotion criteria.
+3. **Realistic fill modeling.** `lib/fills.py` adds pessimistic friction (1 bp slippage + 1 bp half-spread per side) to paper-sim fills so paper PnL doesn't overstate edge.
+4. **v1 routine set is 3 routines, not 8.** `pre_market`, `end_of_day`, `self_learning_review` (observations-only). The rest are scaffolded but `enabled: false` in `routine_schedule.yaml`.
+5. **Self-Learning is observations-only in v1.** Until ≥ 90 trading days AND ≥ 50 paper trades, the agent writes to `memory/` but produces zero proposals. `prompts/proposed_updates/.v2_enabled` is the toggle that opens v2 mode.
+6. **Cost caps in `risk_limits.yaml > cost_caps`.** Per-routine bounds on subagent dispatches, tokens (advisory), decisions, and self-learning proposals.
+7. **GitHub Actions watchdog.** `.github/workflows/eod_watchdog.yml` runs at 17:30 ET on trading days; if no EOD commit landed, fires a Telegram alert. This is the reliability backstop the review correctly demanded.
+8. **Deterministic unit tests** at `tests/test_signals.py` — 11 tests proving signal logic is reproducible. The whole point of moving decisions into Python is that they're now testable.
+
+The original phased architecture below still describes the long-run system. The differences are all about *what's active in v1*.
+
+---
+
 ## Context
 
 You want a Claude-native automation system that researches a 12-symbol **sector-ETF rotation universe** during U.S. trading hours, makes structured trade decisions, paper-trades them via Alpaca, journals every action, commits artifacts to GitHub, and learns from its own outcomes — without ever silently escalating itself toward real money. The goal is **risk-adjusted outperformance vs SPY** over rolling 6- and 12-month windows, with max drawdown held at or below SPY's drawdown over the same window. Absolute return alone is not the target.

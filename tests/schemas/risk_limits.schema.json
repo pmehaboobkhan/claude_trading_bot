@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "risk_limits.yaml",
   "type": "object",
-  "required": ["schema_version", "account", "limits", "permissions", "halts", "gates", "data"],
+  "required": ["schema_version", "account", "limits", "permissions", "halts", "gates", "data", "cost_caps", "fills"],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "type": "integer", "const": 1 },
@@ -87,6 +87,32 @@
       "required": ["max_data_staleness_seconds"],
       "properties": {
         "max_data_staleness_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "cost_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_subagent_dispatches_per_routine",
+        "max_tokens_per_routine_advisory",
+        "max_self_learning_proposals_per_cycle",
+        "max_decisions_per_routine"
+      ],
+      "properties": {
+        "max_subagent_dispatches_per_routine": { "type": "integer", "minimum": 1 },
+        "max_tokens_per_routine_advisory": { "type": "integer", "minimum": 1000 },
+        "max_self_learning_proposals_per_cycle": { "type": "integer", "minimum": 0 },
+        "max_decisions_per_routine": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fills": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slippage_bps", "half_spread_bps", "commission_per_trade"],
+      "properties": {
+        "slippage_bps": { "type": "number", "minimum": 0 },
+        "half_spread_bps": { "type": "number", "minimum": 0 },
+        "commission_per_trade": { "type": "number", "minimum": 0 }
       }
     }
   }

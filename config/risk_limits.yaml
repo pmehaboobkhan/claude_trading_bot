@@ -34,3 +34,19 @@ gates:
   minimum_paper_trades_before_live: 50
 data:
   max_data_staleness_seconds: 60
+cost_caps:
+  # Bound how many subagents the orchestrator may dispatch in a single routine run.
+  # Prevents runaway agent loops eating tokens.
+  max_subagent_dispatches_per_routine: 20
+  # Advisory cap on tokens per routine. Routine logs warn when exceeded; doesn't halt.
+  max_tokens_per_routine_advisory: 200000
+  # Self-Learning is in observations-only mode in v1, so this should be 0 until v2 opens.
+  max_self_learning_proposals_per_cycle: 0
+  # Max trade_decision.json files written per routine run.
+  max_decisions_per_routine: 12
+fills:
+  # Pessimistic friction parameters used by lib/paper_sim via lib/fills.
+  # We'd rather underestimate edge than overestimate.
+  slippage_bps: 1.0
+  half_spread_bps: 1.0
+  commission_per_trade: 0.0   # Alpaca is $0 commission on US equities/ETFs

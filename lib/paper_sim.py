@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from lib.fills import FillModel, commission, simulated_fill_price
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PAPER_DIR = REPO_ROOT / "trades" / "paper"
 LOG_PATH = PAPER_DIR / "log.csv"
@@ -88,20 +90,27 @@ def append_fill(fill: PaperFill) -> None:
         csv.writer(f).writerow(row)
 
 
-def open_position(*, symbol: str, side: str, quantity: float, price: float,
+def open_position(*, symbol: str, side: str, quantity: float, quote_price: float,
                   rationale_link: str, stop_loss: float, take_profit: float,
-                  notes: str = "") -> PaperFill:
-    """Simulate opening a position. Updates positions.json + appends to log.csv."""
+                  notes: str = "", fill_model: FillModel | None = None) -> PaperFill:
+    """Simulate opening a position with realistic slippage + spread.
+
+    `quote_price` is the latest market quote at decision time. The actual fill price
+    applied to the log includes slippage + half-spread per `lib.fills`.
+    """
+    fill_price = simulated_fill_price(side=side, quote_price=quote_price, model=fill_model)
+    fee = commission(model=fill_model)
     fill = PaperFill(
         timestamp=datetime.now(UTC).isoformat(),
         symbol=symbol,
         side=side,
         quantity=quantity,
-        simulated_price=price,
+        simulated_price=round(fill_price, 4),
         rationale_link=rationale_link,
         stop_loss=stop_loss,
         take_profit=take_profit,
         status="OPEN",
+        realized_pnl=round(-fee, 2),  # fee booked at entry
         notes=notes,
     )
     append_fill(fill)
@@ -109,7 +118,7 @@ def open_position(*, symbol: str, side: str, quantity: float, price: float,
     pos[symbol] = {
         "side": side,
         "quantity": quantity,
-        "entry_price": price,
+        "entry_price": fill.simulated_price,
         "entry_ts": fill.timestamp,
         "stop_loss": stop_loss,
         "take_profit": take_profit,
@@ -119,20 +128,22 @@ def open_position(*, symbol: str, side: str, quantity: float, price: float,
     return fill
 
 
-def close_position(symbol: str, *, price: float, rationale_link: str,
-                   notes: str = "") -> PaperFill:
-    """Simulate closing a position. Computes realized PnL, updates positions.json + log.csv."""
+def close_position(symbol: str, *, quote_price: float, rationale_link: str,
+                   notes: str = "", fill_model: FillModel | None = None) -> PaperFill:
+    """Simulate closing a position with realistic slippage. Computes realized PnL."""
     pos = _read_positions()
     if symbol not in pos:
         raise KeyError(f"no open paper position for {symbol}")
     p = pos.pop(symbol)
-    pnl = (price - p["entry_price"]) * p["quantity"] * (1 if p["side"] == "BUY" else -1)
+    fill_price = simulated_fill_price(side="CLOSE", quote_price=quote_price, model=fill_model)
+    fee = commission(model=fill_model)
+    pnl = (fill_price - p["entry_price"]) * p["quantity"] * (1 if p["side"] == "BUY" else -1) - fee
     fill = PaperFill(
         timestamp=datetime.now(UTC).isoformat(),
         symbol=symbol,
         side="CLOSE",
         quantity=p["quantity"],
-        simulated_price=price,
+        simulated_price=round(fill_price, 4),
         rationale_link=rationale_link,
         stop_loss=None,
         take_profit=None,

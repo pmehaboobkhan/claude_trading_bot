@@ -12,12 +12,14 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["cron", "prompt", "halt_on_error"],
+        "required": ["cron", "prompt", "halt_on_error", "enabled"],
         "additionalProperties": false,
         "properties": {
           "cron": { "type": "string", "minLength": 1 },
           "prompt": { "type": "string", "pattern": "^prompts/routines/.+\\.md$" },
-          "halt_on_error": { "type": "boolean" }
+          "halt_on_error": { "type": "boolean" },
+          "enabled": { "type": "boolean" },
+          "phase": { "type": "string", "minLength": 1 }
         }
       }
     }

@@ -2,6 +2,28 @@
 
 > Tracks the work to build the system described in `plan.md`. Check items off as they land. Treat the **gates** as hard — do not skip ahead.
 
+## Post-Review Refactor (2026-05-10)
+
+Following an external architecture review, v1 was tightened along the lines below.
+All of these items are complete unless explicitly marked otherwise.
+
+- [x] `lib/indicators.py` — pure technical indicator computations.
+- [x] `lib/signals.py` — deterministic strategy signal generation; decisions originate here, not in Claude.
+- [x] `lib/fills.py` — realistic slippage + half-spread fill modeling.
+- [x] `lib/paper_sim.py` — updated to use `lib/fills.py`; round-trip friction ~4 bps baked in.
+- [x] `lib/backtest.py` — event-driven backtest harness with metrics, benchmarks (SPY + equal-weight sectors), and promotion criteria.
+- [x] `tests/test_signals.py` — 11 deterministic unit tests proving signal reproducibility.
+- [x] `technical_analysis` agent refactored — wraps `lib.signals` output, doesn't compute or decide.
+- [x] `trade_proposal` agent refactored — wraps deterministic signal into a decision; never overrides Python's action.
+- [x] `self_learning` agent — observations-only v1 mode; v2 proposals gated on `prompts/proposed_updates/.v2_enabled` toggle.
+- [x] `config/routine_schedule.yaml` — v1 enables only `pre_market`, `end_of_day`, `self_learning_review`; others `enabled: false`.
+- [x] `config/risk_limits.yaml` — `cost_caps` and `fills` sections added.
+- [x] `.github/workflows/eod_watchdog.yml` — Telegram alert if no EOD commit by 17:30 ET on trading days.
+- [x] `pre_market` and `end_of_day` routine prompts rewritten to drive `lib.signals` (Python computes, Claude wraps).
+- [ ] **Run first backtest** of `sector_relative_strength_rotation` over 5+ years before any paper trading.
+- [ ] **Configure Alpaca paper keys + Telegram in Claude Code routine secrets** (operator task).
+- [ ] **Create `.github` repo + add secrets** if you want the watchdog active.
+
 ---
 
 ## Open decisions (block scaffold)
