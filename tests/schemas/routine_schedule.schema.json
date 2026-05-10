@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "routine_schedule.yaml",
+  "type": "object",
+  "required": ["schema_version", "timezone", "trading_days_only", "routines"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "timezone": { "type": "string", "minLength": 1 },
+    "trading_days_only": { "type": "boolean" },
+    "routines": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["cron", "prompt", "halt_on_error"],
+        "additionalProperties": false,
+        "properties": {
+          "cron": { "type": "string", "minLength": 1 },
+          "prompt": { "type": "string", "pattern": "^prompts/routines/.+\\.md$" },
+          "halt_on_error": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

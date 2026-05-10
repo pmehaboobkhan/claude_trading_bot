@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "trade_decision.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "timestamp",
+    "routine_id",
+    "symbol",
+    "decision",
+    "thesis_bull",
+    "thesis_bear",
+    "invalidation_condition",
+    "risk_reward",
+    "position_size",
+    "confidence_score",
+    "risk_manager_verdict",
+    "compliance_verdict",
+    "human_approval_required",
+    "final_status"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "routine_id": { "type": "string", "minLength": 1 },
+    "symbol": { "type": "string", "pattern": "^[A-Z]{1,5}$" },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "NO_TRADE",
+        "WATCH",
+        "PAPER_BUY",
+        "PAPER_SELL",
+        "PAPER_CLOSE",
+        "PROPOSE_LIVE_BUY",
+        "PROPOSE_LIVE_SELL",
+        "PROPOSE_LIVE_CLOSE",
+        "HALT_TRADING"
+      ]
+    },
+    "thesis_bull": { "type": "string", "minLength": 1 },
+    "thesis_bear": { "type": "string", "minLength": 1 },
+    "invalidation_condition": { "type": "string", "minLength": 1 },
+    "risk_reward": {
+      "type": "object",
+      "required": ["entry", "stop", "target", "ratio"],
+      "properties": {
+        "entry": { "type": "number" },
+        "stop": { "type": "number" },
+        "target": { "type": "number" },
+        "ratio": { "type": "number", "minimum": 0 }
+      }
+    },
+    "position_size": {
+      "type": "object",
+      "required": ["shares", "usd", "pct_of_account"],
+      "properties": {
+        "shares": { "type": "number", "minimum": 0 },
+        "usd": { "type": "number", "minimum": 0 },
+        "pct_of_account": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "risk_manager_verdict": { "type": "string", "enum": ["APPROVED", "REJECTED", "NEEDS_HUMAN"] },
+    "compliance_verdict": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+    "human_approval_required": { "type": "boolean" },
+    "final_status": {
+      "type": "string",
+      "enum": ["PAPER_PROPOSED", "PAPER_FILLED", "PAPER_REJECTED", "WATCHING", "NO_TRADE", "REJECTED", "PROPOSED_LIVE", "AWAITING_HUMAN"]
+    }
+  }
+}

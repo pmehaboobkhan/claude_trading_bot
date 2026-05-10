@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "risk_limits.yaml",
+  "type": "object",
+  "required": ["schema_version", "account", "limits", "permissions", "halts", "gates", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "last_reviewed": { "type": "string", "format": "date" },
+    "last_reviewed_by": { "type": "string" },
+    "account": {
+      "type": "object",
+      "required": ["paper_starting_capital"],
+      "additionalProperties": false,
+      "properties": {
+        "paper_starting_capital": { "type": "number", "minimum": 0 },
+        "live_starting_capital": { "type": "number", "minimum": 0 }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_daily_loss_usd",
+        "max_daily_loss_pct",
+        "max_weekly_loss_pct",
+        "max_monthly_loss_pct",
+        "max_position_size_pct",
+        "max_total_equity_exposure_pct",
+        "max_trades_per_day",
+        "max_open_positions",
+        "default_stop_loss_pct",
+        "default_take_profit_pct",
+        "minimum_risk_reward"
+      ],
+      "properties": {
+        "max_daily_loss_usd": { "type": "number", "exclusiveMinimum": 0 },
+        "max_daily_loss_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "max_weekly_loss_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "max_monthly_loss_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "max_position_size_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "max_total_equity_exposure_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "max_tech_correlated_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_defensive_correlated_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_trades_per_day": { "type": "integer", "minimum": 0 },
+        "max_open_positions": { "type": "integer", "minimum": 0 },
+        "default_stop_loss_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "default_take_profit_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 },
+        "minimum_risk_reward": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allow_margin", "allow_options", "allow_short_selling", "allow_leveraged_etfs", "allow_averaging_down"],
+      "properties": {
+        "allow_margin": { "type": "boolean" },
+        "allow_options": { "type": "boolean" },
+        "allow_short_selling": { "type": "boolean" },
+        "allow_leveraged_etfs": { "type": "boolean" },
+        "allow_averaging_down": { "type": "boolean" }
+      }
+    },
+    "halts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["halt_after_consecutive_losses", "halt_after_daily_limit_breach", "cool_off_days_after_halt"],
+      "properties": {
+        "halt_after_consecutive_losses": { "type": "integer", "minimum": 1 },
+        "halt_after_daily_limit_breach": { "type": "boolean" },
+        "cool_off_days_after_halt": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["require_human_approval_for_live_trades", "minimum_paper_trading_days_before_live", "minimum_paper_trades_before_live"],
+      "properties": {
+        "require_human_approval_for_live_trades": { "type": "boolean", "const": true },
+        "minimum_paper_trading_days_before_live": { "type": "integer", "minimum": 30 },
+        "minimum_paper_trades_before_live": { "type": "integer", "minimum": 30 }
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_data_staleness_seconds"],
+      "properties": {
+        "max_data_staleness_seconds": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+schema_version: 1
+last_reviewed: "2026-05-09"
+last_reviewed_by: human
+allowed_strategies:
+  - name: sector_relative_strength_rotation
+    status: ACTIVE_PAPER_TEST
+    description: >-
+      Overweight sector ETFs with strongest 20d/60d relative strength vs SPY in a confirmed
+      up-regime; underweight or skip those with deteriorating RS.
+  - name: regime_defensive_tilt
+    status: ACTIVE_PAPER_TEST
+    description: >-
+      In high-volatility / risk-off regime (VIX > 22 or breadth deterioration), tilt toward
+      XLP/XLU/XLV; reduce XLK/XLY/XLC exposure.
+  - name: trend_pullback_in_leader
+    status: NEEDS_MORE_DATA
+    description: >-
+      Pullback to 20DMA on the leading sector ETF, in a confirmed market uptrend.
+  - name: spy_neutral_default
+    status: ACTIVE_PAPER_TEST
+    description: >-
+      When no sector edge is detected, hold SPY as the do-no-harm default rather than overtrading.
+disallowed_strategies:
+  - day_trading_scalp
+  - news_chase
+  - single_stock_earnings_play
+  - momentum_late_entry
+  - inverse_or_leveraged_etf_use
+  - options_strategies
+  - short_selling
+required_confirmations:
+  sector_relative_strength_rotation:
+    - "Up-regime confirmed (SPY > 50DMA AND breadth positive)"
+    - "Sector RS rank top-3 vs SPY on both 20d AND 60d windows"
+    - "Sector ETF above its own 50DMA"
+  regime_defensive_tilt:
+    - "VIX > 22 OR SPY < 50DMA OR sector breadth turning negative"
+    - "Defensive sector RS improving vs SPY over 10d"
+  trend_pullback_in_leader:
+    - "ETF in top-3 sector RS"
+    - "Pullback within 2-3% of 20DMA"
+    - "RSI between 40-55"
+  spy_neutral_default:
+    - "No sector ETF passes any of the above criteria"
+minimum_risk_reward_ratio: 2.0
+minimum_liquidity_avg_daily_volume: 5000000
+abnormal_volatility_threshold_atr_multiplier: 2.5
+holding_earnings_caution_window_days: 1

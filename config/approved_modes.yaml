@@ -1,0 +1,19 @@
+schema_version: 1
+mode: RESEARCH_ONLY
+mode_set_at: "2026-05-09T00:00:00-04:00"
+mode_set_by: human
+mode_set_reason: "Initial scaffold. Phase 1 — research-only until paper-trading harness is verified."
+
+# Allowed transitions (enforced by hook #11):
+#   RESEARCH_ONLY  -> PAPER_TRADING  (human PR)
+#   PAPER_TRADING  -> RESEARCH_ONLY  (human PR or /halt-trading flips through HALTED first)
+#   PAPER_TRADING  -> LIVE_PROPOSALS (human PR; Phase 6+)
+#   LIVE_PROPOSALS -> LIVE_EXECUTION (human PR; Phase 8+; signed risk profile required)
+#   any            -> HALTED         (via /halt-trading slash command, which writes a paired logs/risk_events/ entry)
+#   HALTED         -> previous       (human PR only)
+
+history:
+  - mode: RESEARCH_ONLY
+    set_at: "2026-05-09T00:00:00-04:00"
+    set_by: human
+    reason: "Initial scaffold."

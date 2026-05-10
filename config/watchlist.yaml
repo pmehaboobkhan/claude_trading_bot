@@ -1,0 +1,104 @@
+schema_version: 1
+last_reviewed: "2026-05-09"
+last_reviewed_by: human
+universe: sector_etf_rotation
+benchmarks:
+  primary: SPY
+  secondary: SECTOR_EW
+symbols:
+  - symbol: SPY
+    company_name: SPDR S&P 500 ETF Trust
+    sector: Benchmark
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 30
+    notes: "Benchmark + neutral position. When no clear sector edge is detected, holding SPY is the do-no-harm default."
+  - symbol: XLK
+    company_name: Technology Select Sector SPDR Fund
+    sector: Technology
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 25
+    notes: "Largest SPX sector. Heavily AAPL/MSFT/NVDA-driven; tech leadership = SPX leadership."
+  - symbol: XLF
+    company_name: Financial Select Sector SPDR Fund
+    sector: Financials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Sensitive to rates and yield curve. Watch FOMC, 2y/10y spread, bank stress signals."
+  - symbol: XLE
+    company_name: Energy Select Sector SPDR Fund
+    sector: Energy
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Driven by crude oil and geopolitics. Often anticorrelated with broad market."
+  - symbol: XLV
+    company_name: Health Care Select Sector SPDR Fund
+    sector: Health Care
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Defensive sector. Watch policy/regulatory headlines."
+  - symbol: XLY
+    company_name: Consumer Discretionary Select Sector SPDR Fund
+    sector: Consumer Discretionary
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Heavily AMZN/TSLA-weighted. Risk-on cyclical. Watch retail sales and consumer confidence."
+  - symbol: XLP
+    company_name: Consumer Staples Select Sector SPDR Fund
+    sector: Consumer Staples
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Defensive. Outperforms in risk-off / late-cycle regimes."
+  - symbol: XLI
+    company_name: Industrial Select Sector SPDR Fund
+    sector: Industrials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Cyclical. Watch ISM PMI, capex cycle, transports."
+  - symbol: XLB
+    company_name: Materials Select Sector SPDR Fund
+    sector: Materials
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Cyclical. Watch commodity prices, USD, China demand."
+  - symbol: XLRE
+    company_name: Real Estate Select Sector SPDR Fund
+    sector: Real Estate
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Highly rate-sensitive. Inverse to long yields."
+  - symbol: XLU
+    company_name: Utilities Select Sector SPDR Fund
+    sector: Utilities
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 15
+    notes: "Defensive, rate-sensitive (bond proxy). Outperforms in flight-to-quality."
+  - symbol: XLC
+    company_name: Communication Services Select Sector SPDR Fund
+    sector: Communication Services
+    approved_for_research: true
+    approved_for_paper_trading: true
+    approved_for_live_trading: false
+    max_position_size_pct: 20
+    notes: "Heavily META/GOOGL-weighted; behaves more like tech than telecom."

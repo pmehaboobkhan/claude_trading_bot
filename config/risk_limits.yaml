@@ -1,0 +1,36 @@
+schema_version: 1
+last_reviewed: "2026-05-09"
+last_reviewed_by: human
+account:
+  paper_starting_capital: 100000   # adjust to match your Alpaca paper account
+  live_starting_capital: 0         # Phase 8+ only
+limits:
+  max_daily_loss_usd: 500
+  max_daily_loss_pct: 0.5
+  max_weekly_loss_pct: 2.0
+  max_monthly_loss_pct: 5.0
+  max_position_size_pct: 25.0
+  max_total_equity_exposure_pct: 95.0
+  max_tech_correlated_pct: 40.0       # combined XLK + XLY + XLC cap
+  max_defensive_correlated_pct: 40.0  # combined XLP + XLU + XLV cap
+  max_trades_per_day: 4
+  max_open_positions: 5
+  default_stop_loss_pct: 4.0
+  default_take_profit_pct: 8.0
+  minimum_risk_reward: 2.0
+permissions:
+  allow_margin: false
+  allow_options: false
+  allow_short_selling: false
+  allow_leveraged_etfs: false
+  allow_averaging_down: false
+halts:
+  halt_after_consecutive_losses: 3
+  halt_after_daily_limit_breach: true
+  cool_off_days_after_halt: 1
+gates:
+  require_human_approval_for_live_trades: true
+  minimum_paper_trading_days_before_live: 60
+  minimum_paper_trades_before_live: 50
+data:
+  max_data_staleness_seconds: 60

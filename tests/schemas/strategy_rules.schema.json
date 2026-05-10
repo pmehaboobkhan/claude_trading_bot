@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "strategy_rules.yaml",
+  "type": "object",
+  "required": ["schema_version", "allowed_strategies", "disallowed_strategies", "minimum_risk_reward_ratio"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "last_reviewed": { "type": "string", "format": "date" },
+    "last_reviewed_by": { "type": "string" },
+    "allowed_strategies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE_PAPER_TEST", "NEEDS_MORE_DATA", "UNDER_REVIEW", "PAUSED", "REJECTED", "CANDIDATE_FOR_HUMAN_REVIEW"]
+          },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "disallowed_strategies": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "required_confirmations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "minItems": 1
+      }
+    },
+    "minimum_risk_reward_ratio": { "type": "number", "exclusiveMinimum": 0 },
+    "minimum_liquidity_avg_daily_volume": { "type": "integer", "minimum": 0 },
+    "abnormal_volatility_threshold_atr_multiplier": { "type": "number", "exclusiveMinimum": 0 },
+    "earnings_blackout_window_days": { "type": "integer", "minimum": 0 },
+    "holding_earnings_caution_window_days": { "type": "integer", "minimum": 0 }
+  }
+}

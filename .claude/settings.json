@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/block_live.sh" },
+          { "type": "command", "command": ".claude/hooks/journal_immutability.sh" },
+          { "type": "command", "command": ".claude/hooks/block_prompt_overwrites.sh" },
+          { "type": "command", "command": ".claude/hooks/halt_audit.sh" },
+          { "type": "command", "command": ".claude/hooks/append_only.sh" },
+          { "type": "command", "command": ".claude/hooks/require_strategy_tests.sh" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/scan_secrets.sh" },
+          { "type": "command", "command": ".claude/hooks/block_broker_calls.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/validate_yaml_schema.sh" },
+          { "type": "command", "command": ".claude/hooks/validate_decision_schema.sh" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/log_session_start.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/log_session_end.sh" }
+        ]
+      }
+    ]
+  }
+}

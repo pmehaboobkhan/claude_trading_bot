@@ -1,0 +1,36 @@
+schema_version: 1
+timezone: America/New_York
+trading_days_only: true
+routines:
+  pre_market:
+    cron: "30 6 * * 1-5"      # 06:30 ET, Mon-Fri
+    prompt: prompts/routines/pre_market.md
+    halt_on_error: false
+  market_open:
+    cron: "35 9 * * 1-5"      # 09:35 ET (5 min after open)
+    prompt: prompts/routines/market_open.md
+    halt_on_error: false
+  midday:
+    cron: "0 12 * * 1-5"      # 12:00 ET
+    prompt: prompts/routines/midday.md
+    halt_on_error: false
+  pre_close:
+    cron: "30 15 * * 1-5"     # 15:30 ET
+    prompt: prompts/routines/pre_close.md
+    halt_on_error: false
+  end_of_day:
+    cron: "30 16 * * 1-5"     # 16:30 ET
+    prompt: prompts/routines/end_of_day.md
+    halt_on_error: true
+  weekly_review:
+    cron: "0 9 * * 6"         # Saturday 09:00 ET
+    prompt: prompts/routines/weekly_review.md
+    halt_on_error: false
+  monthly_review:
+    cron: "0 9 1 * *"         # 1st of month 09:00 ET
+    prompt: prompts/routines/monthly_review.md
+    halt_on_error: false
+  self_learning_review:
+    cron: "0 10 * * 0"        # Sunday 10:00 ET
+    prompt: prompts/routines/self_learning_review.md
+    halt_on_error: false
