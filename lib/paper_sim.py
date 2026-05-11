@@ -193,3 +193,36 @@ def reconcile() -> dict:
 
 def fill_dict(fill: PaperFill) -> dict:
     return asdict(fill)
+
+
+def portfolio_equity(quotes: dict[str, float], cash_balance: float) -> float:
+    """Sum of open-position mark-to-market value plus cash.
+
+    `quotes` maps symbol → latest price. Any symbol present in positions.json
+    but missing from `quotes` raises KeyError — callers must surface a stale-
+    data alert rather than silently ignore positions. Short positions (`side:
+    "SELL"`) contribute as: `quantity * (2 * entry_price - quote_price)`, the
+    cash-settled short payoff.
+
+    Used by routine code to compute today's portfolio value before consulting
+    the circuit-breaker (`lib.portfolio_risk.advance`).
+    """
+    if cash_balance < 0:
+        raise ValueError(f"cash_balance must be non-negative, got {cash_balance}")
+    pos = _read_positions()
+    equity = float(cash_balance)
+    for sym, p in pos.items():
+        if sym not in quotes:
+            raise KeyError(
+                f"no quote provided for open position {sym}; cannot compute equity"
+            )
+        qty = float(p["quantity"])
+        entry = float(p["entry_price"])
+        quote = float(quotes[sym])
+        if p["side"] == "BUY":
+            equity += qty * quote
+        elif p["side"] == "SELL":
+            equity += qty * (2 * entry - quote)
+        else:
+            raise ValueError(f"unknown side on {sym}: {p['side']}")
+    return equity

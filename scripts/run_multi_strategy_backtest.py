@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 CACHE_DIR = REPO_ROOT / "backtests" / "_yfinance_cache"
 
-from lib import backtest, config, signals  # noqa: E402
+from lib import backtest, config, portfolio_risk, signals  # noqa: E402
 from lib.fills import FillModel, simulated_fill_price  # noqa: E402
 
 
@@ -145,6 +145,94 @@ def run_strategy_c_gld_permanent(bars: dict, *, start_date: str, end_date: str,
 
 
 # ---------------------------------------------------------------------------
+# Cash bucket: SHV buy-and-hold (no rebalancing back to target weight)
+# ---------------------------------------------------------------------------
+
+def run_cash_bucket_shv(bars: dict, *, start_date: str, end_date: str,
+                       capital: float) -> dict:
+    """Hold SHV from start_date to end_date. No friction (it's cash; we never trade it)."""
+    shv_bars = bars["SHV"]
+    in_window = [b for b in shv_bars if start_date <= b["ts"][:10] <= end_date]
+    if not in_window:
+        return {"equity_curve": [], "final_equity": capital}
+    start_price = float(in_window[0]["close"])
+    qty = capital / start_price  # fractional shares OK for cash modeling
+    curve = [(b["ts"][:10], qty * float(b["close"])) for b in in_window]
+    return {"equity_curve": curve, "final_equity": curve[-1][1]}
+
+
+# ---------------------------------------------------------------------------
+# Circuit-breaker: portfolio-level drawdown throttle
+# ---------------------------------------------------------------------------
+# State-machine logic lives in lib/portfolio_risk so paper trading and the
+# backtest share a single source of truth. This function just orchestrates the
+# daily walk over precomputed equity curves.
+
+
+def _daily_returns(curve: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    if len(curve) < 2:
+        return [(d, 0.0) for d, _ in curve]
+    out = [(curve[0][0], 0.0)]
+    for i in range(1, len(curve)):
+        prev = curve[i - 1][1]
+        cur = curve[i][1]
+        out.append((curve[i][0], (cur / prev) - 1 if prev > 0 else 0.0))
+    return out
+
+
+def apply_circuit_breaker(
+    strategy_combined_curve: list[tuple[str, float]],
+    shv_curve: list[tuple[str, float]],
+    initial_capital: float,
+    *,
+    half_dd: float,
+    out_dd: float,
+    recovery_dd: float,
+    out_recover_dd: float,
+) -> tuple[list[tuple[str, float]], list[dict]]:
+    """Walk daily with a portfolio DD throttle.
+
+    Returns (portfolio_equity_curve, throttle_events).
+    `strategy_combined_curve` is the sum of all strategy equity curves over time.
+    `shv_curve` is an SHV buy-and-hold curve on $1 of capital, used to compute
+    the cash leg's daily return.
+    """
+    thresholds = portfolio_risk.CircuitBreakerThresholds(
+        half_dd=half_dd,
+        out_dd=out_dd,
+        half_to_full_recover_dd=recovery_dd,
+        out_to_half_recover_dd=out_recover_dd,
+    )
+    strat_rets = _daily_returns(strategy_combined_curve)
+    cash_rets = {d: r for d, r in _daily_returns(shv_curve)}
+
+    cb_state = portfolio_risk.CircuitBreakerState()
+    portfolio = initial_capital
+    events: list[dict] = []
+    curve: list[tuple[str, float]] = []
+
+    for date, strat_ret in strat_rets:
+        throttle = portfolio_risk.exposure_fraction(cb_state.state)
+        cash_ret = cash_rets.get(date, 0.0)
+        port_ret = throttle * strat_ret + (1 - throttle) * cash_ret
+        portfolio = portfolio * (1 + port_ret)
+
+        result = portfolio_risk.step(cb_state, portfolio, thresholds)
+        if result.transitioned:
+            events.append({
+                "date": date,
+                "from": result.previous_state,
+                "to": result.new_state.state,
+                "dd_pct": result.drawdown * 100,
+                "portfolio": portfolio,
+            })
+        cb_state = result.new_state
+        curve.append((date, portfolio))
+
+    return curve, events
+
+
+# ---------------------------------------------------------------------------
 # Metrics
 # ---------------------------------------------------------------------------
 
@@ -218,9 +306,34 @@ def main() -> int:
                         help="Allocation for large_cap_momentum_top5 (0-1)")
     parser.add_argument("--alloc-c", type=float, default=DEFAULT_ALLOCATION["gold_permanent_overlay"],
                         help="Allocation for gold_permanent_overlay (0-1)")
+    parser.add_argument("--cash-buffer-pct", type=float, default=0.0,
+                        help="Fraction of total capital held in SHV as a cash buffer (0-0.95). "
+                             "alloc-a/b/c are interpreted as shares of the deployed portion "
+                             "and must still sum to 1.0; their effective share of total capital "
+                             "is alloc_i * (1 - cash_buffer_pct).")
+    parser.add_argument("--circuit-breaker", action="store_true",
+                        help="Apply portfolio-level drawdown circuit-breaker. Throttle state "
+                             "machine: FULL (100%% strategies) → HALF (50%%) at --cb-half-dd → "
+                             "OUT (0%%) at --cb-out-dd. Recover to FULL when DD ≤ --cb-recovery-dd. "
+                             "When throttled, the remainder sits in SHV.")
+    parser.add_argument("--cb-half-dd", type=float, default=0.08,
+                        help="Drawdown that trips FULL → HALF (default 0.08 = 8%%).")
+    parser.add_argument("--cb-out-dd", type=float, default=0.12,
+                        help="Drawdown that trips HALF → OUT (default 0.12 = 12%%).")
+    parser.add_argument("--cb-recovery-dd", type=float, default=0.05,
+                        help="Drawdown below which HALF → FULL (default 0.05 = 5%%). "
+                             "Provides hysteresis vs the 8%% HALF trigger.")
+    parser.add_argument("--cb-out-recover-dd", type=float, default=0.08,
+                        help="Drawdown below which OUT → HALF (default 0.08 = 8%%). "
+                             "Asymmetric vs cb-recovery-dd: tight hysteresis around HALF, "
+                             "fast recovery from OUT.")
     parser.add_argument("--label", default="",
                         help="Optional tag included in the report filename")
     args = parser.parse_args()
+
+    if not 0.0 <= args.cash_buffer_pct < 0.95:
+        print(f"FATAL: --cash-buffer-pct must be in [0, 0.95), got {args.cash_buffer_pct}")
+        return 1
 
     ALLOCATION = {
         "dual_momentum_taa": args.alloc_a,
@@ -229,15 +342,29 @@ def main() -> int:
     }
     total_alloc = sum(ALLOCATION.values())
     if abs(total_alloc - 1.0) > 0.001:
-        print(f"FATAL: allocations sum to {total_alloc:.3f}, must equal 1.0")
+        print(f"FATAL: strategy allocations sum to {total_alloc:.3f}, must equal 1.0 "
+              f"(they're shares of the deployed portion; cash buffer is separate)")
         return 1
+
+    deployed_frac = 1.0 - args.cash_buffer_pct
+    cash_capital = args.capital * args.cash_buffer_pct
+    deployed_capital = args.capital * deployed_frac
 
     print(f"Multi-strategy backtest")
     print(f"  Window: {args.start} → {args.end}")
     print(f"  Capital: ${args.capital:,.0f}")
-    print(f"  Allocations: A={ALLOCATION['dual_momentum_taa']:.0%} "
-          f"B={ALLOCATION['large_cap_momentum_top5']:.0%} "
-          f"C={ALLOCATION['gold_permanent_overlay']:.0%}")
+    if args.cash_buffer_pct > 0:
+        print(f"  Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, no rebalancing)")
+        print(f"  Deployed: ${deployed_capital:,.0f}")
+        print(f"  Effective allocations (of total): "
+              f"A={ALLOCATION['dual_momentum_taa'] * deployed_frac:.0%} "
+              f"B={ALLOCATION['large_cap_momentum_top5'] * deployed_frac:.0%} "
+              f"C={ALLOCATION['gold_permanent_overlay'] * deployed_frac:.0%} "
+              f"Cash={args.cash_buffer_pct:.0%}")
+    else:
+        print(f"  Allocations: A={ALLOCATION['dual_momentum_taa']:.0%} "
+              f"B={ALLOCATION['large_cap_momentum_top5']:.0%} "
+              f"C={ALLOCATION['gold_permanent_overlay']:.0%}")
     if args.label:
         print(f"  Label: {args.label}")
     print()
@@ -292,7 +419,7 @@ def main() -> int:
     end_date = sample_last
 
     # --- Strategy A: dual_momentum_taa ---
-    cap_a = args.capital * ALLOCATION["dual_momentum_taa"]
+    cap_a = deployed_capital * ALLOCATION["dual_momentum_taa"]
     print(f"\n[strategy A] dual_momentum_taa ${cap_a:,.0f}...")
     t0 = time.time()
     result_a = backtest.run_backtest(
@@ -309,7 +436,7 @@ def main() -> int:
           f"return {result_a.total_return_pct:+.2f}%, trades {len(result_a.trades)}")
 
     # --- Strategy B: large_cap_momentum_top5 ---
-    cap_b = args.capital * ALLOCATION["large_cap_momentum_top5"]
+    cap_b = deployed_capital * ALLOCATION["large_cap_momentum_top5"]
     print(f"\n[strategy B] large_cap_momentum_top5 ${cap_b:,.0f}...")
     t0 = time.time()
     result_b = backtest.run_backtest(
@@ -326,7 +453,7 @@ def main() -> int:
           f"return {result_b.total_return_pct:+.2f}%, trades {len(result_b.trades)}")
 
     # --- Strategy C: gold_permanent_overlay ---
-    cap_c = args.capital * ALLOCATION["gold_permanent_overlay"]
+    cap_c = deployed_capital * ALLOCATION["gold_permanent_overlay"]
     print(f"\n[strategy C] gold_permanent_overlay ${cap_c:,.0f}...")
     result_c = run_strategy_c_gld_permanent(
         aligned, start_date=start_date, end_date=end_date, capital=cap_c,
@@ -335,15 +462,74 @@ def main() -> int:
     return_c = (final_c / cap_c - 1) * 100
     print(f"  return {return_c:+.2f}%")
 
+    # --- Cash bucket: SHV buy-and-hold for the cash buffer portion ---
+    result_cash = {"equity_curve": [], "final_equity": 0.0}
+    return_cash = 0.0
+    if args.cash_buffer_pct > 0 and cash_capital > 0:
+        print(f"\n[cash bucket] SHV buy-and-hold ${cash_capital:,.0f}...")
+        result_cash = run_cash_bucket_shv(
+            aligned, start_date=start_date, end_date=end_date, capital=cash_capital,
+        )
+        if result_cash["final_equity"] > 0:
+            return_cash = (result_cash["final_equity"] / cash_capital - 1) * 100
+            print(f"  return {return_cash:+.2f}% (treasury bills via SHV)")
+
     # --- Portfolio combine ---
-    portfolio_curve = _combine_equity_curves([
+    curves_to_combine = [
         result_a.equity_curve,
         result_b.equity_curve,
         result_c["equity_curve"],
-    ])
+    ]
+    if result_cash["equity_curve"]:
+        curves_to_combine.append(result_cash["equity_curve"])
+    portfolio_curve = _combine_equity_curves(curves_to_combine)
     if not portfolio_curve:
         print("FATAL: empty portfolio curve")
         return 1
+
+    # --- Optional circuit-breaker pass ---
+    cb_events: list[dict] = []
+    if args.circuit_breaker:
+        # Strategy-only combined curve (without the cash buffer); CB manages cash itself.
+        strategy_only_curve = _combine_equity_curves([
+            result_a.equity_curve,
+            result_b.equity_curve,
+            result_c["equity_curve"],
+        ])
+        # SHV reference curve on $1 of capital — only used for daily returns inside CB.
+        shv_ref = run_cash_bucket_shv(
+            aligned, start_date=start_date, end_date=end_date, capital=1.0,
+        )["equity_curve"]
+        # CB starts with the deployed capital (strategy capital), not args.capital,
+        # so the cash buffer (if any) is preserved and added back at the end.
+        cb_curve, cb_events = apply_circuit_breaker(
+            strategy_only_curve,
+            shv_ref,
+            initial_capital=deployed_capital,
+            half_dd=args.cb_half_dd,
+            out_dd=args.cb_out_dd,
+            recovery_dd=args.cb_recovery_dd,
+            out_recover_dd=args.cb_out_recover_dd,
+        )
+        # Rebuild portfolio_curve = circuit-broken deployed leg + (optional) cash buffer leg.
+        date_to_cb = dict(cb_curve)
+        if result_cash["equity_curve"]:
+            new_curve = []
+            for date, cash_val in result_cash["equity_curve"]:
+                new_curve.append((date, date_to_cb.get(date, 0.0) + cash_val))
+            portfolio_curve = new_curve
+        else:
+            portfolio_curve = cb_curve
+        print(f"\n[circuit-breaker] thresholds: HALF@{args.cb_half_dd:.1%} "
+              f"OUT@{args.cb_out_dd:.1%} HALF→FULL@{args.cb_recovery_dd:.1%} "
+              f"OUT→HALF@{args.cb_out_recover_dd:.1%}")
+        print(f"[circuit-breaker] {len(cb_events)} throttle events"
+              if cb_events else "[circuit-breaker] no triggers in window")
+        for ev in cb_events[:20]:
+            print(f"  {ev['date']}  {ev['from']:>4} → {ev['to']:<4}  "
+                  f"DD={ev['dd_pct']:.2f}%  port=${ev['portfolio']:,.0f}")
+        if len(cb_events) > 20:
+            print(f"  ... {len(cb_events) - 20} more events (see report)")
 
     final_equity = portfolio_curve[-1][1]
     total_return = (final_equity / args.capital - 1) * 100
@@ -377,12 +563,15 @@ def main() -> int:
     print(f"  Sharpe (rough):      {sharpe:.2f}")
     print()
     print(f"  Per-strategy contributions to final equity:")
-    print(f"    A (TAA, 60%):       ${result_a.final_equity:>12,.2f}  "
+    print(f"    A (TAA):            ${result_a.final_equity:>12,.2f}  "
           f"(return {result_a.total_return_pct:+.2f}%)")
     print(f"    B (large-cap mom):  ${result_b.final_equity:>12,.2f}  "
           f"(return {result_b.total_return_pct:+.2f}%)")
     print(f"    C (gold overlay):   ${final_c:>12,.2f}  "
           f"(return {return_c:+.2f}%)")
+    if args.cash_buffer_pct > 0:
+        print(f"    Cash (SHV):         ${result_cash['final_equity']:>12,.2f}  "
+              f"(return {return_cash:+.2f}%)")
     print()
     print(f"  SPY buy & hold (context):")
     print(f"    Total return:       {spy_return:+.2f}%")
@@ -410,8 +599,8 @@ def main() -> int:
     overall = hit_low and dd_ok and sharpe_ok
     print(f"  OVERALL: {'PASS — portfolio meets minimum targets' if overall else 'FAIL — see above'}")
     print()
-    print(f"  Promotion path: keep all 3 strategies as NEEDS_MORE_DATA until the same "
-          f"targets are hit in paper trading for 90+ days AND 30+ closed trades.")
+    print(f"  Live-trading unlock: requires the same targets met in paper trading for "
+          f"90+ days AND 30+ closed trades, plus a signed PR to docs/risk_profile.md.")
 
     # --- Write report ---
     report_dir = REPO_ROOT / "backtests" / "multi_strategy_portfolio"
@@ -431,17 +620,25 @@ def main() -> int:
         f"- Years: {years:.2f}",
         "",
         "## Allocations and per-strategy contribution",
-        "| Strategy | Allocation | Return | Final equity | Trades |",
+        f"- Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, static — no rebalancing)",
+        f"- Deployed: ${deployed_capital:,.0f}",
+        "",
+        "| Strategy | Allocation (of total) | Return | Final equity | Trades |",
         "|---|---:|---:|---:|---:|",
-        f"| dual_momentum_taa | {ALLOCATION['dual_momentum_taa']:.0%} | "
+        f"| dual_momentum_taa | {ALLOCATION['dual_momentum_taa'] * deployed_frac:.1%} | "
         f"{result_a.total_return_pct:+.2f}% | ${result_a.final_equity:,.2f} | "
         f"{sum(1 for t in result_a.trades if t['side'] == 'EXIT')} |",
-        f"| large_cap_momentum_top5 | {ALLOCATION['large_cap_momentum_top5']:.0%} | "
+        f"| large_cap_momentum_top5 | {ALLOCATION['large_cap_momentum_top5'] * deployed_frac:.1%} | "
         f"{result_b.total_return_pct:+.2f}% | ${result_b.final_equity:,.2f} | "
         f"{sum(1 for t in result_b.trades if t['side'] == 'EXIT')} |",
-        f"| gold_permanent_overlay | {ALLOCATION['gold_permanent_overlay']:.0%} | "
+        f"| gold_permanent_overlay | {ALLOCATION['gold_permanent_overlay'] * deployed_frac:.1%} | "
         f"{return_c:+.2f}% | ${final_c:,.2f} | "
         f"{sum(1 for t in result_c['trades'] if t['side'] == 'EXIT')} |",
+        *(
+            [f"| cash_buffer_shv | {args.cash_buffer_pct:.1%} | "
+             f"{return_cash:+.2f}% | ${result_cash['final_equity']:,.2f} | 0 |"]
+            if args.cash_buffer_pct > 0 else []
+        ),
         "",
         "## SPY buy & hold (context only — not a hurdle)",
         f"- Total return: {spy_return:+.2f}%",
@@ -461,6 +658,24 @@ def main() -> int:
         "",
         f"**Overall: {'PASS' if overall else 'FAIL'}**",
         "",
+        *(
+            [
+                "## Circuit-breaker",
+                f"- Thresholds: FULL → HALF @ {args.cb_half_dd:.1%} DD, "
+                f"HALF → OUT @ {args.cb_out_dd:.1%} DD, "
+                f"HALF → FULL @ {args.cb_recovery_dd:.1%} DD, "
+                f"OUT → HALF @ {args.cb_out_recover_dd:.1%} DD.",
+                f"- Throttle events: {len(cb_events)} over the window.",
+                "",
+                "| Date | From | To | Drawdown | Portfolio |",
+                "|---|---|---|---:|---:|",
+                *[f"| {ev['date']} | {ev['from']} | {ev['to']} | "
+                  f"{ev['dd_pct']:.2f}% | ${ev['portfolio']:,.0f} |"
+                  for ev in cb_events],
+                "",
+            ]
+            if args.circuit_breaker else []
+        ),
         "## Caveats",
         "- Backtest uses yfinance survivor-biased current S&P 100 large-cap universe;",
         "  large_cap_momentum_top5 results are optimistic for periods where losers were excluded.",
@@ -468,6 +683,20 @@ def main() -> int:
         "- No tax modeling — real-world returns would be lower for short-term gains.",
         "- 12-month momentum warmup means actual trading window is "
         f"{warmup} days shorter than the calendar window.",
+        *(
+            ["- Cash buffer is STATIC (no rebalancing). As strategies compound, the cash share of "
+             "the portfolio shrinks, so its DD protection weakens in later years. A rebalanced "
+             "variant would have lower returns and lower DD."]
+            if args.cash_buffer_pct > 0 else []
+        ),
+        *(
+            ["- Circuit-breaker is post-hoc on daily returns: the throttle scales today's "
+             "strategy-leg contribution to portfolio return; the cash leg earns SHV's daily "
+             "return. This is an approximation — a true live circuit-breaker would execute "
+             "rebalance trades on the day of the trigger and pay friction. Real-world results "
+             "would be marginally worse (a few bps per transition)."]
+            if args.circuit_breaker else []
+        ),
     ]
     report_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"  Report: {report_file.relative_to(REPO_ROOT)}")

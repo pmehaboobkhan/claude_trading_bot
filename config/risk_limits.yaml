@@ -1,5 +1,5 @@
 schema_version: 1
-last_reviewed: "2026-05-09"
+last_reviewed: "2026-05-11"
 last_reviewed_by: human
 account:
   paper_starting_capital: 100000   # adjust to match your Alpaca paper account
@@ -52,3 +52,15 @@ fills:
   slippage_bps: 1.0
   half_spread_bps: 1.0
   commission_per_trade: 0.0   # Alpaca is $0 commission on US equities/ETFs
+circuit_breaker:
+  # Path Z asymmetric — adopted 2026-05-11 after backtest evidence in
+  # reports/learning/pivot_validation_2026-05-10.md.
+  # Asymmetric recovery: tight 3pp band around the HALF trigger (prevents
+  # FULL↔HALF whipsaw); wider 4pp band below the OUT trigger (recovers fast
+  # enough to catch post-crash rallies — symmetric 5%/5% sat in cash 4 years
+  # after the 2020 COVID drop).
+  enabled: true
+  half_dd: 0.08                    # FULL → HALF at 8% portfolio drawdown
+  out_dd: 0.12                     # HALF → OUT at 12% portfolio drawdown
+  half_to_full_recover_dd: 0.05    # HALF → FULL when DD ≤ 5% (3pp hysteresis)
+  out_to_half_recover_dd: 0.08     # OUT → HALF when DD ≤ 8% (4pp hysteresis)

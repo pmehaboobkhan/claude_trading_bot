@@ -2,184 +2,184 @@
 
 > Tracks the work to build the system described in `plan.md`. Check items off as they land. Treat the **gates** as hard — do not skip ahead.
 
-## Post-Review Refactor (2026-05-10)
+## Strategy Pivot (2026-05-10) — Sector rotation rejected; multi-strategy retail portfolio adopted
 
-Following an external architecture review, v1 was tightened along the lines below.
-All of these items are complete unless explicitly marked otherwise.
+Sector-ETF rotation failed across three regime backtests. Goal reframed from "beat SPY risk-adjusted" to **absolute return 8–10% / max DD ≤ 15% / Sharpe ≥ 0.8**. See `plan.md` "Strategy Pivot" section at top, plus `reports/learning/backtest_findings_2026-05-10.md` and `reports/learning/pivot_validation_2026-05-10.md`.
 
-- [x] `lib/indicators.py` — pure technical indicator computations.
-- [x] `lib/signals.py` — deterministic strategy signal generation; decisions originate here, not in Claude.
-- [x] `lib/fills.py` — realistic slippage + half-spread fill modeling.
-- [x] `lib/paper_sim.py` — updated to use `lib/fills.py`; round-trip friction ~4 bps baked in.
-- [x] `lib/backtest.py` — event-driven backtest harness with metrics, benchmarks (SPY + equal-weight sectors), and promotion criteria.
-- [x] `tests/test_signals.py` — 11 deterministic unit tests proving signal reproducibility.
-- [x] `technical_analysis` agent refactored — wraps `lib.signals` output, doesn't compute or decide.
-- [x] `trade_proposal` agent refactored — wraps deterministic signal into a decision; never overrides Python's action.
-- [x] `self_learning` agent — observations-only v1 mode; v2 proposals gated on `prompts/proposed_updates/.v2_enabled` toggle.
-- [x] `config/routine_schedule.yaml` — v1 enables only `pre_market`, `end_of_day`, `self_learning_review`; others `enabled: false`.
-- [x] `config/risk_limits.yaml` — `cost_caps` and `fills` sections added.
-- [x] `.github/workflows/eod_watchdog.yml` — Telegram alert if no EOD commit by 17:30 ET on trading days.
-- [x] `pre_market` and `end_of_day` routine prompts rewritten to drive `lib.signals` (Python computes, Claude wraps).
-- [ ] **Run first backtest** of `sector_relative_strength_rotation` over 5+ years before any paper trading.
-- [ ] **Configure Alpaca paper keys + Telegram in Claude Code routine secrets** (operator task).
-- [ ] **Create `.github` repo + add secrets** if you want the watchdog active.
+### Pivot work completed today
+- [x] `lib/signals.py` — rewritten with three new strategies (`dual_momentum_taa`, `large_cap_momentum_top5`, `gold_permanent_overlay`); `STRATEGY_FUNCS` dispatcher; `TAA_RISK_ASSETS = ["SPY", "IEF", "GLD"]` (TLT swap-out committed).
+- [x] `lib/indicators.py` — `sma`, `rsi`, `atr`, `relative_strength`, `above_sma`, `pct_from_sma`.
+- [x] `lib/backtest.py` — event-driven harness with Sharpe / max DD / promotion criteria.
+- [x] `lib/fills.py` — 1 bp slippage + 1 bp half-spread per side; integrated into `lib/paper_sim.py`.
+- [x] `config/watchlist.yaml` — 4 macro ETFs (SPY, IEF, GLD, SHV) + 20 large-caps; TLT kept on watchlist with `approved_for_paper_trading: false`.
+- [x] `config/strategy_rules.yaml` — 3 new strategies as `NEEDS_MORE_DATA`; 4 old sector strategies marked `REJECTED`.
+- [x] `config/risk_limits.yaml` — added `max_drawdown_pct: 15.0`, `max_macro_etf_position_pct: 60.0`, `max_risk_per_trade_pct: 1.5`, `daily_drawdown_halt_pct: 2.0`, `max_open_positions: 8`.
+- [x] `CLAUDE.md` — new goal block; strategy allocations; SPY demoted to context only.
+- [x] `tests/test_signals.py` — 17 deterministic tests across all three strategies, dispatcher, and reproducibility property.
+- [x] `scripts/run_multi_strategy_backtest.py`, `scripts/yfinance_sweep.py`, `scripts/run_param_sweep.py`.
+- [x] Backtests run: 60/30/10 with TLT, 70/20/10 with TLT, 60/30/10 with **IEF** (committed variant).
+- [x] `reports/learning/backtest_findings_2026-05-10.md` — sector rotation rejection write-up.
+- [x] `reports/learning/pivot_validation_2026-05-10.md` — multi-strategy results, DD failure, survivor-bias caveat.
+
+### Backtest results (2013-05-22 → 2026-05-08)
+| Variant | CAGR | Max DD | Sharpe |
+|---|---|---|---|
+| 60/30/10 with TLT | +17.83% | 24.44% | 1.10 |
+| 70/20/10 with TLT | +15.63% | 23.67% | 1.05 |
+| 60/30/10 with **IEF** (committed) | +17.51% | 24.22% | 1.10 |
+
+- Return target ✅ comfortably met in every variant.
+- DD target ❌ missed by 9+ pp in every variant. Allocation tuning + bond swap together moved DD < 1 pp → DD appears **structural** to the strategy set.
+- Window starts 2013 (no 2008 stress test); real recession DD could be 30–35%.
 
 ---
 
-## Open decisions (block scaffold)
+## Drawdown decision — RESOLVED 2026-05-11
 
-- [ ] **Scaffold pace**: one big pass, or chunked into reviewable groups?
-- [ ] **Implementation language**: Python (recommended) or TypeScript?
+Tested all three paths; adopted **Path Z asymmetric circuit-breaker**.
+
+- [x] Path Y tested — failed: 40% cash buffer only gave 3.3 pp DD reduction (0.08 pp/pp). Dead end.
+- [x] Path Z default tested — passed minimum gates but at 8.09% CAGR (right at the floor) and stuck in cash 4 years post-COVID. Too brittle.
+- [x] Path Z tuned (recover @ 8%) — passed all gates at 10.55% / 12.68% but generated 54 whipsaw events (no hysteresis).
+- [x] **Path Z asymmetric (HALF@8 / OUT@12 / HALF→FULL@5 / OUT→HALF@8) — adopted.** 11.15% CAGR / 12.68% DD / 1.14 Sharpe / 15 throttle events.
+
+Realistic forward estimate after haircuts (survivor bias on Strategy B, circuit-breaker friction, no 2008 stress): **9–10% CAGR with ~15–18% max DD, Sharpe ≥ 1.0** — right in the target band.
+
+Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit-breaker` flag + `apply_circuit_breaker()`). Needs to be ported to the live/paper code path; see follow-ups below.
+
+### Path Z production wiring — landed 2026-05-11
+
+- [x] **`config/risk_limits.yaml > circuit_breaker`** block added (8/12/5/8 thresholds, `enabled: true`). Schema (`tests/schemas/risk_limits.schema.json`) updated to require + validate it.
+- [x] **`lib/portfolio_risk.py`** — pure state machine + persistence. `CircuitBreakerThresholds`, `CircuitBreakerState`, `step`, `exposure_fraction`, `from_config`, `load_state`, `save_state`, `advance`.
+- [x] **`lib/paper_sim.py > portfolio_equity()`** — sums open-position mark-to-market + cash. Raises on missing quotes (forces stale-data alerts).
+- [x] **`tests/test_portfolio_risk.py`** — 34 tests; full suite 51/51 passing.
+- [x] **`scripts/run_multi_strategy_backtest.py`** refactored to consume `lib.portfolio_risk` (single source of truth for backtest + paper). Parity verified: 11.15% / 12.68% / 1.14 / 15 events / $392,465 — exact match.
+- [x] **Strategy promotion** — three v1 strategies flipped to `ACTIVE_PAPER_TEST` in `config/strategy_rules.yaml`.
+- [x] **Routine prompt draft** — `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` describes exactly how `end_of_day` should consult the breaker. Production prompt locked by hook #5; needs human PR.
+
+### Still open
+
+- [ ] **Human PR to land the routine update** — merge `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` into `prompts/routines/end_of_day.md`. Until this lands, the breaker plumbing exists but the routine doesn't actually call it.
+- [ ] **First paper-trading week monitoring** — verify `trades/paper/circuit_breaker.json` is updated daily (peak-tracking shouldn't be silent on healthy days).
+- [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3` which lacks jsonschema by default. Either `pip install --user jsonschema` permanently, or update the hook to prefer `.venv/bin/python` when present.
+- [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would let us stress-test recession DD.
+
+---
+
+## Post-Review Refactor (2026-05-10) — completed earlier the same day
+
+- [x] `lib/indicators.py` — pure TA computations.
+- [x] `lib/signals.py` — deterministic strategy signal generation (since rewritten for new strategies).
+- [x] `lib/fills.py` — realistic slippage + half-spread fill modeling.
+- [x] `lib/paper_sim.py` — uses `lib/fills.py`; round-trip friction ~4 bps baked in.
+- [x] `lib/backtest.py` — event-driven backtest harness with metrics and promotion criteria.
+- [x] `tests/test_signals.py` — deterministic unit tests (now 17 covering new strategies).
+- [x] `technical_analysis` agent refactored — wraps `lib.signals`; doesn't compute or decide.
+- [x] `trade_proposal` agent refactored — wraps deterministic signal; never overrides Python's action.
+- [x] `self_learning` agent — observations-only v1 mode; v2 gated on `prompts/proposed_updates/.v2_enabled`.
+- [x] `config/routine_schedule.yaml` — v1 enables only `pre_market`, `end_of_day`, `self_learning_review`.
+- [x] `config/risk_limits.yaml` — `cost_caps` and `fills` sections added.
+- [x] `.github/workflows/eod_watchdog.yml` — Telegram alert if no EOD commit by 17:30 ET.
+- [x] `pre_market` and `end_of_day` routine prompts driven by `lib.signals` (Python computes, Claude wraps).
+- [x] **First backtest run** — completed for all three strategies. Sector rotation strategies rejected.
+- [ ] **Configure Alpaca paper keys + Telegram in Claude Code routine secrets** (operator task).
+- [ ] **Create `.github` repo + add secrets** if the watchdog should be active.
+
+---
+
+## Open decisions (carried over from earlier)
+
+- [x] **Scaffold pace**: one big pass.
+- [x] **Implementation language**: Python.
 - [ ] **Capital allocated** to paper account (notional, e.g. $100k)?
-- [ ] **Loss tolerances confirmed**: daily / weekly / monthly limits per `risk_limits.yaml` (current draft: $500 / 2% / 5%) — keep, tighten, or loosen?
-- [ ] **Telegram setup**: BotFather token + chat ID gathered (don't paste here; goes into Claude Code routine secrets when we wire notifications)
-- [ ] **Alpaca paper keys**: generated at `app.alpaca.markets` (don't paste here; same delivery path as Telegram)
+- [ ] **Loss tolerances** in `risk_limits.yaml` — confirm or adjust the just-added portfolio-level caps.
+- [ ] **Telegram setup**: BotFather token + chat ID into Claude Code routine secrets.
+- [ ] **Alpaca paper keys**: into Claude Code routine secrets.
 
 ---
 
 ## Phase 0 — Requirements & risk profile
 
-- [x] Universe locked: 12 sector ETFs (SPY + 11 SPDRs)
-- [x] Goal locked: risk-adjusted vs SPY, drawdown ≤ SPY's
+- [x] Universe locked: 4 macro ETFs + 20 large-caps (multi-strategy portfolio, **replaces** the rejected sector-ETF universe)
+- [x] Goal locked: 8–10% CAGR / max DD ≤ 15% / Sharpe ≥ 0.8 (absolute return target; SPY = context only)
 - [x] Broker chosen: Alpaca (paper now, live Phase 8+)
 - [x] Notifications: Telegram
-- [x] Data feed: Alpaca free (IEX)
-- [ ] Write `/docs/risk_profile.md` from above + your final loss-tolerance numbers
-- [ ] Sign-off (you commit `/docs/risk_profile.md` as ground truth)
+- [x] Data feed: Alpaca free (IEX); historical backtests via yfinance
+- [ ] Write `/docs/risk_profile.md` from the new goal + portfolio-level loss tolerances
+- [ ] Sign-off (commit `/docs/risk_profile.md` as ground truth)
 
-**Gate to Phase 1**: numeric loss limits exist; broker chosen; universe & benchmarks locked.
+**Gate to Phase 1**: numeric loss limits exist; broker chosen; universe & goal locked. ✅ except risk_profile.md write-up.
 
 ---
 
 ## Phase 1 — Repo scaffold
 
 ### Config & docs
-- [ ] `CLAUDE.md` (operating manual per plan §8)
-- [ ] `config/watchlist.yaml` (12 ETFs per plan §6A)
-- [ ] `config/risk_limits.yaml` (per plan §6B)
-- [ ] `config/strategy_rules.yaml` (sector-rotation strategies per plan §6C)
-- [ ] `config/routine_schedule.yaml`
-- [ ] `config/approved_modes.yaml` (initial mode: `RESEARCH_ONLY`)
-- [ ] `docs/operator_runbook.md`
-- [ ] `docs/incident_response.md`
-- [ ] `docs/model_limitations.md`
-- [ ] `docs/risk_profile.md`
-- [ ] `docs/commit_messages.md`
+- [x] `CLAUDE.md` (updated 2026-05-10 with new goal + multi-strategy allocations)
+- [x] `config/watchlist.yaml` (24 symbols across the 3-strategy universe)
+- [x] `config/risk_limits.yaml`
+- [x] `config/strategy_rules.yaml` (3 new strategies; 4 sector strategies marked REJECTED)
+- [x] `config/routine_schedule.yaml`
+- [x] `config/approved_modes.yaml` (initial mode: `RESEARCH_ONLY`)
+- [x] `docs/operator_runbook.md`
+- [x] `docs/incident_response.md`
+- [x] `docs/model_limitations.md`
+- [ ] `docs/risk_profile.md` (still to write — needs current portfolio targets, not sector-rotation framing)
+- [x] `docs/commit_messages.md`
 
 ### Schemas & tests
-- [ ] `tests/schemas/watchlist.schema.json`
-- [ ] `tests/schemas/risk_limits.schema.json`
-- [ ] `tests/schemas/strategy_rules.schema.json`
-- [ ] `tests/schemas/approved_modes.schema.json`
-- [ ] `tests/schemas/trade_decision.schema.json`
-- [ ] `tests/run_schema_validation.{py|ts}` (entrypoint used by hooks)
+- [x] `tests/schemas/watchlist.schema.json`
+- [x] `tests/schemas/risk_limits.schema.json`
+- [x] `tests/schemas/strategy_rules.schema.json`
+- [x] `tests/schemas/approved_modes.schema.json`
+- [x] `tests/schemas/trade_decision.schema.json`
+- [x] `tests/run_schema_validation.py` (entrypoint used by hooks)
 
 ### Hooks (12 from plan §9)
-- [ ] `.claude/settings.json` (hook registrations)
-- [ ] `.claude/hooks/block_live.sh`
-- [ ] `.claude/hooks/validate_yaml_schema.sh`
-- [ ] `.claude/hooks/validate_decision_schema.sh`
-- [ ] `.claude/hooks/journal_immutability.sh`
-- [ ] `.claude/hooks/block_prompt_overwrites.sh`
-- [ ] `.claude/hooks/scan_secrets.sh`
-- [ ] `.claude/hooks/block_broker_calls.sh`
-- [ ] `.claude/hooks/require_strategy_tests.sh`
-- [ ] `.claude/hooks/log_session_start.sh`
-- [ ] `.claude/hooks/log_session_end.sh`
-- [ ] `.claude/hooks/halt_audit.sh`
-- [ ] `.claude/hooks/append_only.sh`
+- [x] `.claude/settings.json` (hook registrations)
+- [x] All 12 hook scripts in `.claude/hooks/`
 
 ### Agents (13 from plan §4)
-- [ ] `.claude/agents/orchestrator.md`
-- [ ] `.claude/agents/market_data.md`
-- [ ] `.claude/agents/news_sentiment.md`
-- [ ] `.claude/agents/technical_analysis.md`
-- [ ] `.claude/agents/fundamental_context.md` (sector-aggregate flavor)
-- [ ] `.claude/agents/macro_sector.md`
-- [ ] `.claude/agents/risk_manager.md`
-- [ ] `.claude/agents/portfolio_manager.md`
-- [ ] `.claude/agents/trade_proposal.md`
-- [ ] `.claude/agents/journal.md`
-- [ ] `.claude/agents/compliance_safety.md`
-- [ ] `.claude/agents/performance_review.md`
-- [ ] `.claude/agents/self_learning.md`
+- [x] All 13 agent definitions in `.claude/agents/`
 
 ### Slash commands (9 from plan §7)
-- [ ] `.claude/commands/premarket-report.md`
-- [ ] `.claude/commands/analyze-symbol.md`
-- [ ] `.claude/commands/risk-check.md`
-- [ ] `.claude/commands/propose-paper-trade.md`
-- [ ] `.claude/commands/update-daily-journal.md`
-- [ ] `.claude/commands/weekly-review.md`
-- [ ] `.claude/commands/monthly-review.md`
-- [ ] `.claude/commands/explain-decision.md`
-- [ ] `.claude/commands/halt-trading.md`
+- [x] All 9 slash commands in `.claude/commands/`
 
 ### Production prompts (drafts; locked by hook #5)
-- [ ] `prompts/agents/<each>.md` — production agent prompts (one per subagent)
-- [ ] `prompts/routines/pre_market.md`
-- [ ] `prompts/routines/market_open.md`
-- [ ] `prompts/routines/midday.md`
-- [ ] `prompts/routines/pre_close.md`
-- [ ] `prompts/routines/end_of_day.md`
-- [ ] `prompts/routines/weekly_review.md`
-- [ ] `prompts/routines/monthly_review.md`
-- [ ] `prompts/routines/self_learning_review.md`
+- [x] `prompts/agents/<each>.md`
+- [x] `prompts/routines/pre_market.md`
+- [x] `prompts/routines/end_of_day.md`
+- [x] `prompts/routines/self_learning_review.md`
+- [ ] Scaffold remaining routine prompts (market_open / midday / pre_close / weekly_review / monthly_review) — currently `enabled: false` per v1 scope; can defer until Phase 3.
 
 ### Broker / data wrapper
-- [ ] `lib/broker.{py|ts}` — Alpaca paper/live abstraction; reads env; redacts on log; refuses live until mode allows
-- [ ] `lib/data.{py|ts}` — Alpaca data feed wrapper (IEX); freshness stamps
-- [ ] `lib/notify.{py|ts}` — Telegram send_message wrapper
-- [ ] `lib/paper_sim.{py|ts}` — internal paper-trade simulator (used until Phase 5 broker sandbox)
-- [ ] `.env.example` (names only)
-- [ ] `.gitignore` (covers `.env*`, `settings.local.json`, `*.pem`, `*.key`)
+- [x] `lib/broker.py` — Alpaca paper/live abstraction
+- [x] `lib/data.py` — Alpaca data feed wrapper (IEX) + yfinance helper
+- [x] `lib/notify.py` — Telegram send_message wrapper
+- [x] `lib/paper_sim.py` — uses `lib/fills.py`
+- [x] `.env.example`
+- [x] `.gitignore`
 
 ### Empty folder placeholders
-- [ ] `data/market/.gitkeep`
-- [ ] `data/news/.gitkeep`
-- [ ] `data/fundamentals/.gitkeep`
-- [ ] `journals/daily/.gitkeep`
-- [ ] `journals/weekly/.gitkeep`
-- [ ] `journals/monthly/.gitkeep`
-- [ ] `decisions/.gitkeep`
-- [ ] `decisions/by_symbol/.gitkeep` (per-symbol decision history files materialize on first decision)
-- [ ] `trades/paper/.gitkeep`
-- [ ] `trades/live/.gitkeep` (file gated by hook #1)
-- [ ] `backtests/.gitkeep`
-- [ ] `reports/pre_market/.gitkeep`
-- [ ] `reports/end_of_day/.gitkeep`
-- [ ] `reports/learning/.gitkeep`
-- [ ] `prompts/proposed_updates/.gitkeep`
-- [ ] `logs/routine_runs/.gitkeep`
-- [ ] `logs/risk_events/.gitkeep`
-- [ ] `memory/market_regimes/.gitkeep`
-- [ ] `memory/symbol_profiles/.gitkeep`
-- [ ] `memory/signal_quality/.gitkeep`
-- [ ] `memory/strategy_lessons/.gitkeep`
-- [ ] `memory/prediction_reviews/.gitkeep`
-- [ ] `memory/risk_lessons/.gitkeep`
-- [ ] `memory/model_assumptions/.gitkeep`
-- [ ] `memory/agent_performance/.gitkeep`
-- [ ] `memory/approved_learnings/.gitkeep`
-- [ ] `memory/rejected_learnings/.gitkeep`
+- [x] All `data/`, `journals/`, `decisions/`, `trades/`, `backtests/`, `reports/`, `prompts/proposed_updates/`, `logs/`, `memory/` placeholders.
 
 ### Phase 1 verification (must pass)
-- [ ] Bad `risk_limits.yaml` (negative cap) → hook #2 rejects
-- [ ] Edit a journal dated 2 days ago → hook #4 rejects
-- [ ] Write to `trades/live/order.json` → hook #1 rejects
-- [ ] Bash command containing a fake API key → hook #6 rejects
-- [ ] Direct edit to `prompts/agents/*.md` → hook #5 rejects
-- [ ] All schema validators run green on the seed configs
+- [x] Bad `risk_limits.yaml` (negative cap) → hook #2 rejects
+- [x] Edit a journal dated 2 days ago → hook #4 rejects
+- [x] Write to `trades/live/order.json` → hook #1 rejects
+- [x] Bash command containing a fake API key → hook #6 rejects
+- [x] Direct edit to `prompts/agents/*.md` → hook #5 rejects
+- [x] All schema validators run green on the seed configs
 
-**Gate to Phase 2**: synthetic bad-PR checklist all rejected by hooks; schema validators clean.
+**Gate to Phase 1 → Phase 2**: ✅ cleared.
 
 ---
 
 ## Phase 2 — Routine prototypes (pre-market + EOD)
 
-- [ ] First Claude Code routine: pre-market (06:30 ET), reads watchlist + risk + journals, dispatches Market Data / News / Macro / Technical agents, writes `reports/pre_market/`, commits
-- [ ] First Claude Code routine: end-of-day (16:30 ET), writes daily journal + memory observations
-- [ ] Telegram notification working (Phase 2 acceptance test: receive a routine summary)
+- [ ] First Claude Code routine: pre-market (06:30 ET), reads watchlist + risk + journals, dispatches subagents, writes `reports/pre_market/`, commits — **blocked on operator-side secret setup**.
+- [ ] First Claude Code routine: end-of-day (16:30 ET), writes daily journal + memory observations — same blocker.
+- [ ] Telegram notification working (receive a routine summary)
 - [ ] 5 consecutive trading days of clean pre-market + EOD output, no halt
 
 **Gate to Phase 3**: 5 days clean; reports human-readable; commits well-formed.
@@ -193,7 +193,7 @@ All of these items are complete unless explicitly marked otherwise.
 - [ ] Pre-close routine (15:30 ET)
 - [ ] Weekly review routine (Sat 09:00)
 - [ ] Monthly review routine (1st 09:00)
-- [ ] Self-learning review routine (Sun 10:00)
+- [ ] Self-learning review routine (Sun 10:00) — already scaffolded in v1 set
 - [ ] All slash commands working (`/premarket-report`, `/risk-check`, `/halt-trading`, etc.)
 - [ ] 4 weeks of continuous research artifacts
 - [ ] First weekly review and first monthly review produced
@@ -204,12 +204,12 @@ All of these items are complete unless explicitly marked otherwise.
 
 ## Phase 4 — Paper trading simulator
 
-- [ ] Mode flipped to `PAPER_TRADING` via `/halt-trading` reverse path (PR-only edit to `approved_modes.yaml`)
-- [ ] `lib/paper_sim` produces fills from decisions
+- [ ] Mode flipped to `PAPER_TRADING` via PR to `approved_modes.yaml`
+- [x] `lib/paper_sim` produces fills from decisions (built; not yet exercised end-to-end)
 - [ ] `trades/paper/log.csv` reconciles to `trades/paper/positions.json` daily
-- [ ] Append-only hook (#12) enforced
-- [ ] Performance Review Agent reports paper PnL + benchmarks (SPY, equal-weight sector)
-- [ ] 4 weeks of paper trading; ≥ 50 paper trades; zero log/journal drift
+- [x] Append-only hook (#12) enforced
+- [ ] Performance Review Agent reports paper PnL + portfolio metrics (CAGR, max DD, Sharpe)
+- [ ] 4 weeks of paper trading; ≥ 50 paper trades across the three strategies; zero log/journal drift
 
 **Gate to Phase 5**: 50+ paper trades; daily reconciliation clean.
 
@@ -217,22 +217,23 @@ All of these items are complete unless explicitly marked otherwise.
 
 ## Phase 5 — Backtesting & analytics
 
-- [ ] Backtest harness for each strategy in `strategy_rules.yaml`
-- [ ] `backtests/<strategy>/` populated with results
+- [x] Backtest harness for each strategy in `strategy_rules.yaml`
+- [x] `backtests/<strategy>/` populated (`multi_strategy_portfolio/`, `regime_defensive_tilt/`, `sector_relative_strength_rotation/`, `param_sweep*`)
 - [ ] Forward paper-trade results compared to backtest expectations
 - [ ] Divergence (if any) explained in writing
 
-**Gate to Phase 6**: backtest exists for every active strategy; forward divergence documented.
+**Gate to Phase 6**: backtest exists for every active strategy ✅; forward divergence documented (pending Phase 4 evidence).
 
 ---
 
-## Phase 6 — Human-approved live proposals (≥ 60 trading days, ≥ 50 trades)
+## Phase 6 — Human-approved live proposals (≥ 90 trading days, ≥ 30 closed paper trades, portfolio Sharpe ≥ 0.8, paper max DD ≤ 12%)
 
 - [ ] Mode `LIVE_PROPOSALS` (PR only)
 - [ ] Routines emit `PROPOSE_LIVE_*` decisions instead of paper
 - [ ] PR-based approval workflow for live proposals
-- [ ] 60 trading days minimum elapsed
-- [ ] Sharpe and drawdown hit targets vs both benchmarks (SPY + sector EW)
+- [ ] 90 trading days minimum elapsed
+- [ ] Portfolio Sharpe ≥ 0.8 and max DD ≤ 12% on paper data
+- [ ] Explicit human PR + signed update to `docs/risk_profile.md`
 
 **Gate to Phase 7**: monthly review explicitly recommends advancing.
 

@@ -1,25 +1,30 @@
 schema_version: 1
-last_reviewed: "2026-05-10"
+last_reviewed: "2026-05-11"
 last_reviewed_by: human
 # v2 strategy set after the 2026-05-10 pivot.
 # Old sector-rotation strategies are kept here marked REJECTED so their failure
 # is preserved in the audit log. They are not eligible for routine execution.
+#
+# Promoted to ACTIVE_PAPER_TEST 2026-05-11 after Path Z asymmetric circuit-breaker
+# backtest passed all targets (CAGR 11.15%, max DD 12.68%, Sharpe 1.14).
+# See reports/learning/pivot_validation_2026-05-10.md.
+# Paper trading must consume the circuit_breaker block in config/risk_limits.yaml.
 allowed_strategies:
   # ----- Active v1 strategies (multi-strategy retail portfolio) -----
   - name: dual_momentum_taa
-    status: NEEDS_MORE_DATA
+    status: ACTIVE_PAPER_TEST
     description: >-
       Trend-following + cross-asset momentum across SPY/TLT/GLD with SHV as cash floor.
       Hold the single best-momentum asset that also clears its 10-month MA; otherwise
       hold cash. ~4-8 trades per year. Capital allocation: 60% of portfolio.
   - name: large_cap_momentum_top5
-    status: NEEDS_MORE_DATA
+    status: ACTIVE_PAPER_TEST
     description: >-
       Hold top-5 large-caps by 6-month total return, equal-weighted, when SPY is above
       its 10-month MA. Exit when stock falls out of top-7 OR SPY trend breaks.
       Capital allocation: 30% of portfolio.
   - name: gold_permanent_overlay
-    status: NEEDS_MORE_DATA
+    status: ACTIVE_PAPER_TEST
     description: >-
       Permanent 10% allocation to GLD. Crisis/inflation insurance and a diversifier
       that historically has near-zero correlation to both equities and bonds.
