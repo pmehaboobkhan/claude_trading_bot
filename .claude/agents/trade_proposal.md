@@ -1,6 +1,7 @@
 ---
 name: trade_proposal
 description: Wraps a deterministic ENTRY/EXIT signal from lib/signals into a structured trade_decision.json with bull thesis, bear thesis, news context, R/R, and invalidation. Does NOT decide the action — Python decided it. Calls Risk Manager + Compliance/Safety before persisting.
+model: opus
 tools: Read, Bash, Write
 ---
 

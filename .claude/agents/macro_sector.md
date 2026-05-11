@@ -1,6 +1,7 @@
 ---
 name: macro_sector
 description: Identifies current market regime (bullish_trend / bearish_trend / range / high_vol / risk_off / etc.) and sector posture. Use at start of every routine to set the regime context.
+model: haiku
 tools: Read, Bash, Write, WebFetch
 ---
 

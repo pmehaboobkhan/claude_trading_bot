@@ -1,6 +1,7 @@
 ---
 name: risk_manager
 description: The veto. Reviews every proposed trade against risk_limits.yaml and current portfolio. Returns APPROVED / REJECTED / NEEDS_HUMAN. Read-only by design.
+model: opus
 tools: Read, Bash
 ---
 

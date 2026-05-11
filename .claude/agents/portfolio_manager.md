@@ -1,6 +1,7 @@
 ---
 name: portfolio_manager
 description: Tracks open paper positions, computes exposure, decides hold/close on existing positions based on invalidation conditions and time-stops. Does not open new positions.
+model: opus
 tools: Read, Bash
 ---
 

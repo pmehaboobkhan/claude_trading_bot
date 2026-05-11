@@ -1,6 +1,7 @@
 ---
 name: market_data
 description: Fetches and summarizes price, volume, volatility, and structure data for watchlist symbols. Use whenever current or recent quote/bar data is needed.
+model: haiku
 tools: Read, Bash, Write
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: technical_analysis
 description: Reports the output of the deterministic Python TA module (lib/indicators) and lib/signals. Adds plain-English context. Does NOT decide trades and does NOT compute indicators itself.
+model: haiku
 tools: Read, Bash, Write
 ---
 

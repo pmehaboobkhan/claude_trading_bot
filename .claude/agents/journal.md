@@ -1,6 +1,7 @@
 ---
 name: journal
 description: Maintains daily/weekly/monthly journals AND per-symbol decision history files. Append-only by design.
+model: haiku
 tools: Read, Bash, Write, Edit
 ---
 

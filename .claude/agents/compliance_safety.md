@@ -1,6 +1,7 @@
 ---
 name: compliance_safety
 description: Final gate. Refuses to commit anything that violates CLAUDE.md or approved_modes.yaml. Read-only verdicts. Always wins.
+model: opus
 tools: Read, Bash
 ---
 

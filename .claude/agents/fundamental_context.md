@@ -1,6 +1,7 @@
 ---
 name: fundamental_context
 description: For sector ETFs — sector-aggregate fundamentals + ETF holdings concentration + earnings calendar of dominant holdings. Use weekly + on holding earnings events.
+model: haiku
 tools: Read, Bash, Write, WebFetch
 ---
 

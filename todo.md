@@ -57,6 +57,11 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [x] **Strategy promotion** — three v1 strategies flipped to `ACTIVE_PAPER_TEST` in `config/strategy_rules.yaml`.
 - [x] **Routine prompt draft** — `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` describes exactly how `end_of_day` should consult the breaker. Production prompt locked by hook #5; needs human PR.
 
+### Per-agent model routing — landed 2026-05-11
+
+- [x] Added `model:` to each `.claude/agents/*.md` frontmatter. 7 agents on `haiku` (retrieval / templating / metric work), 6 on `opus` (judgment / gating / thesis writing). See `plan.md` "Per-agent model routing" for full mapping + rationale.
+- [ ] **Operator action**: when creating the routines on Claude Code web, set the routine-level default model to **Opus 4.7** so the orchestrator session is on the smart model. Subagent delegations will use their declared `model:` and skip Opus where they don't need it.
+
 ### Still open
 
 - [ ] **Human PR to land the routine update** — merge `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` into `prompts/routines/end_of_day.md`. Until this lands, the breaker plumbing exists but the routine doesn't actually call it.

@@ -85,6 +85,28 @@ See `reports/learning/pivot_validation_2026-05-10.md` for the full Path X/Y/Z co
 - [x] `config/strategy_rules.yaml` — three v1 strategies promoted from `NEEDS_MORE_DATA` → `ACTIVE_PAPER_TEST` with a comment block documenting the unlock criteria.
 - [x] `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` — draft routine-prompt update describing exactly how `end_of_day` should consult the breaker (after signal eval, before any new ENTRY). Production prompt is locked by hook #5; merge via human PR.
 
+### Per-agent model routing — landed 2026-05-11
+
+To control LLM cost, each subagent in `.claude/agents/*.md` now declares a `model:` in its YAML frontmatter. Claude Code respects this when the orchestrator delegates via the Task tool: each subagent runs on its declared model regardless of what the routine itself is on. Routine-level default should be set to **Opus 4.7** on Claude Code web (so the orchestrator session is on the smart model); cheap retrieval work happens inside delegations.
+
+| Agent | Model | Why |
+|---|---|---|
+| `market_data` | haiku | Pure data fetch + summarization |
+| `news_sentiment` | haiku | Headline scraping + tone tagging |
+| `fundamental_context` | haiku | ETF holdings + earnings calendar retrieval |
+| `macro_sector` | haiku | Wraps `signals.detect_regime` output narratively |
+| `technical_analysis` | haiku | Wraps `lib.signals` output in plain English |
+| `journal` | haiku | Template assembly from upstream inputs |
+| `performance_review` | haiku | Pure metric computation |
+| `portfolio_manager` | opus | Judgment on hold/close vs invalidation |
+| `risk_manager` | opus | The veto — must understand limit interactions |
+| `trade_proposal` | opus | Bull/bear thesis writing — drives audit-trail quality |
+| `compliance_safety` | opus | Final gate before commit |
+| `self_learning` | opus | Cross-time pattern recognition |
+| `orchestrator` | opus | Coordination, routing decisions |
+
+7 of 13 agents on Haiku; 6 on Opus. Expected ~30–50% per-routine cost reduction without touching reasoning quality where it matters. Audit trail (the bull/bear thesis written by `trade_proposal` and the journal entries) stays on Opus.
+
 ### Still open
 
 - [ ] **Human PR**: merge the proposed `end_of_day` update from `prompts/proposed_updates/` into `prompts/routines/end_of_day.md`. Until this lands, the routine code path doesn't actually call the breaker — the plumbing is built but unwired.

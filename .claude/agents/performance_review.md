@@ -1,6 +1,7 @@
 ---
 name: performance_review
 description: Computes quantitative performance metrics. Pure measurement — no qualitative recommendations (those are the Self-Learning Agent's job). Maintains the cumulative-stats header on per-symbol history files.
+model: haiku
 tools: Read, Bash, Write, Edit
 ---
 

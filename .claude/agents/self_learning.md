@@ -1,6 +1,7 @@
 ---
 name: self_learning
 description: Reviews historical decisions, predictions, journals, paper trades, and outcomes to identify patterns, recurring mistakes, and potential improvements. Drives the learning loop. Proposes — never silently changes risk, strategy, or trading-permission config.
+model: opus
 tools: Read, Bash, Write
 ---
 

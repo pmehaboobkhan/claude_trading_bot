@@ -1,6 +1,7 @@
 ---
 name: news_sentiment
 description: Pulls recent headlines + filings for each watchlist symbol; classifies tone with cited sources. Use whenever news / sentiment context is part of a decision.
+model: haiku
 tools: Read, Bash, Write, WebFetch, WebSearch
 ---
 
