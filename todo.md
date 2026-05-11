@@ -62,12 +62,26 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [x] Added `model:` to each `.claude/agents/*.md` frontmatter. 7 agents on `haiku` (retrieval / templating / metric work), 6 on `opus` (judgment / gating / thesis writing). See `plan.md` "Per-agent model routing" for full mapping + rationale.
 - [ ] **Operator action**: when creating the routines on Claude Code web, set the routine-level default model to **Opus 4.7** so the orchestrator session is on the smart model. Subagent delegations will use their declared `model:` and skip Opus where they don't need it.
 
+### Go-live for paper trading — landed 2026-05-11
+
+- [x] **`prompts/routines/end_of_day.md`** rewritten to wire in the circuit-breaker (step 5 inserted; ENTRY sizing scaled by throttle; OUT → entry rejected with `circuit_breaker_OUT`).
+- [x] **`lib/broker.py`** extended with `account_snapshot()` and `latest_quotes_for_positions()` (called from the EOD routine to mark-to-market open positions).
+- [x] **`config/approved_modes.yaml`** flipped to `PAPER_TRADING` with paired risk-event audit log.
+- [x] **Gates** — 51/51 tests, schema validation clean.
+
+### Operator action — set up routines on Claude Code web
+
+- [ ] Push the commit (`git push`).
+- [ ] On Claude Code web, create three routines pointing at `prompts/routines/{pre_market,end_of_day,self_learning_review}.md` (model: Opus 4.7; timezone: America/New_York; trading-days-only on the first two).
+- [ ] Add secrets to each routine: `ALPACA_PAPER_KEY_ID`, `ALPACA_PAPER_SECRET_KEY`, `ALPACA_PAPER_BASE_URL`, `ALPACA_DATA_BASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+- [ ] Manual `Run now` of `pre_market` first; verify Telegram fires and a commit lands.
+- [ ] Let `pre_market` and `end_of_day` run automatically for one full trading day.
+
 ### Still open
 
-- [ ] **Human PR to land the routine update** — merge `prompts/proposed_updates/2026-05-11_end_of_day_circuit_breaker.md` into `prompts/routines/end_of_day.md`. Until this lands, the breaker plumbing exists but the routine doesn't actually call it.
-- [ ] **First paper-trading week monitoring** — verify `trades/paper/circuit_breaker.json` is updated daily (peak-tracking shouldn't be silent on healthy days).
-- [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3` which lacks jsonschema by default. Either `pip install --user jsonschema` permanently, or update the hook to prefer `.venv/bin/python` when present.
-- [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would let us stress-test recession DD.
+- [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events.
+- [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3`. User-level `pip install jsonschema` is in place, but for portability the hook should prefer `.venv/bin/python` when present.
+- [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would stress-test recession DD.
 
 ---
 

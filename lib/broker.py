@@ -111,3 +111,48 @@ def get_positions() -> list[dict]:
         }
         for p in positions
     ]
+
+
+def account_snapshot() -> dict:
+    """Fuller account snapshot used by the end_of_day circuit-breaker step.
+
+    Returns the fields needed to compute portfolio equity: `cash`, `equity`,
+    `buying_power`, `portfolio_value`, plus `is_paper` so callers can sanity-check
+    they're on the paper account.
+    """
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("alpaca-py not installed") from exc
+
+    creds = credentials(want_live=False)
+    client = TradingClient(creds.key_id, creds.secret, paper=not creds.is_live)
+    acct = client.get_account()
+    return {
+        "account_number": acct.account_number,
+        "status": str(acct.status),
+        "cash": float(acct.cash),
+        "equity": float(acct.equity),
+        "buying_power": float(acct.buying_power),
+        "portfolio_value": float(acct.portfolio_value),
+        "is_paper": not creds.is_live,
+    }
+
+
+def latest_quotes_for_positions() -> dict[str, float]:
+    """Return {symbol: latest_mid_price} for every currently open position.
+
+    Used by the end_of_day circuit-breaker step to mark portfolio equity to
+    market. Missing/zero quotes raise BrokerError so stale-data conditions
+    surface rather than silently zero out positions.
+    """
+    from lib import data
+
+    positions = get_positions()
+    quotes: dict[str, float] = {}
+    for p in positions:
+        q = data.get_latest_quote(p["symbol"])
+        if q.last_price <= 0:
+            raise BrokerError(f"stale/zero quote for open position {p['symbol']}")
+        quotes[p["symbol"]] = q.last_price
+    return quotes

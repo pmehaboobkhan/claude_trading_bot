@@ -107,12 +107,23 @@ To control LLM cost, each subagent in `.claude/agents/*.md` now declares a `mode
 
 7 of 13 agents on Haiku; 6 on Opus. Expected ~30–50% per-routine cost reduction without touching reasoning quality where it matters. Audit trail (the bull/bear thesis written by `trade_proposal` and the journal entries) stays on Opus.
 
+### Go-live for paper trading — landed 2026-05-11
+
+- [x] **`prompts/routines/end_of_day.md`**: circuit-breaker now wired into the production routine (new step 5 between signal eval and trade execution; ENTRYs scaled by throttle; EXITs never throttled; transitions log to `logs/risk_events/`).
+- [x] **`lib/broker.py`**: added `account_snapshot()` (full account snapshot incl. cash) and `latest_quotes_for_positions()` (marks open positions to market for equity computation).
+- [x] **`config/approved_modes.yaml`**: flipped `RESEARCH_ONLY` → `PAPER_TRADING`. Paired audit at `logs/risk_events/2026-05-11_183756_mode_flip_paper_trading.md` per hook #11.
+- [x] **All gates green**: 51/51 tests pass, all configs schema-validate.
+
+The repo is now ready for paper trading. Operator action remaining:
+1. Push the commit.
+2. Set up the three v1 routines on Claude Code web (see step-by-step guide in this session's chat history or `docs/operator_runbook.md`).
+3. Add secrets (Alpaca paper key/secret, Telegram bot token + chat ID) to each routine.
+
 ### Still open
 
-- [ ] **Human PR**: merge the proposed `end_of_day` update from `prompts/proposed_updates/` into `prompts/routines/end_of_day.md`. Until this lands, the routine code path doesn't actually call the breaker — the plumbing is built but unwired.
-- [ ] Backtest with a 2008-inclusive window when feasible (currently the alignment window starts 2013 because META IPO 2012; could substitute SPY-only proxy for Strategy B during the pre-2013 era as a recession-DD sanity check).
-- [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily; verify the breaker advances even when the portfolio is healthy (peak-tracking shouldn't be silent).
-- [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3` which doesn't have jsonschema by default. Either install jsonschema for system python OR update the hook to prefer `.venv/bin/python` when present.
+- [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013 because META IPO 2012).
+- [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
+- [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; user-level `pip install jsonschema` is in place but consider preferring `.venv/bin/python` in the hook for portability.
 
 ### Files materially changed today
 - `lib/signals.py` — three new strategy functions; `STRATEGY_FUNCS` dispatcher; TAA risk-asset set; deterministic.
