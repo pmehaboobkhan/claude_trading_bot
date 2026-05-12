@@ -23,7 +23,7 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
    import json
    from lib import data, signals, config
    symbols = [s["symbol"] for s in config.watchlist()["symbols"]]
-   bars = {sym: data.get_bars(sym, timeframe="1Day", limit=250) for sym in symbols}
+   bars = {sym: data.get_bars(sym, timeframe="1Day", limit=300) for sym in symbols}
    regime = signals.detect_regime(bars["SPY"], vix_value=None)
    sigs = signals.evaluate_all(bars, symbols, regime, config.strategy_rules())
    print(json.dumps({

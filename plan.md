@@ -119,6 +119,16 @@ The repo is now ready for paper trading. Operator action remaining:
 2. Set up the three v1 routines on Claude Code web (see step-by-step guide in this session's chat history or `docs/operator_runbook.md`).
 3. Add secrets (Alpaca paper key/secret, Telegram bot token + chat ID) to each routine.
 
+### Fix 2026-05-12 — Alpaca free-tier `get_bars` returning 1 bar
+
+The first cloud-routine run produced a "data insufficiency" risk event because `lib.data.get_bars` was hitting Alpaca's IEX feed without an explicit `start` date. The free tier returns only the latest bar in that case; Strategy A and B both fall back to NO_TRADE.
+
+- [x] `lib/data.py`: `get_bars` now always computes `start = now - calendar_days(limit)` (1.5× trading-day buffer for daily, 2× for intraday) and passes it explicitly. Also pins `feed="iex"`.
+- [x] Routine prompts (`pre_market.md`, `end_of_day.md`): bumped `limit=250` → `limit=300` so Strategy A's 253-bar minimum has headroom.
+- [x] 51/51 tests still pass; schema validation clean.
+
+The first run's behavior was actually a good safety-design confirmation: the system correctly identified data insufficiency, emitted a risk event, returned NO_TRADE for A and B, and only Strategy C (history-independent gold overlay) emitted an ENTRY. Compliance approved; nothing went to Alpaca that shouldn't have.
+
 ### Still open
 
 - [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013 because META IPO 2012).

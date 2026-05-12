@@ -7,7 +7,7 @@ risk_limits.yaml > data > max_data_staleness_seconds.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from lib.broker import BrokerError, credentials
 
@@ -57,8 +57,28 @@ def get_latest_quote(symbol: str) -> Quote:
     )
 
 
+def _calendar_days_for(timeframe: str, limit: int) -> int:
+    """How many calendar days back to ask for to safely cover `limit` bars of `timeframe`.
+
+    Alpaca's free IEX tier returns only the latest bar when `start` isn't passed —
+    so we always pass `start`. We over-ask (1.5x trading days for daily, 2x for
+    intraday) to cover weekends/holidays and let the API trim.
+    """
+    if timeframe == "1Day":
+        return int(limit * 1.5) + 5
+    if timeframe == "1Hour":
+        return max(int(limit / 7 * 1.5) + 5, 7)        # ~7 trading hours/day
+    if timeframe == "5Min":
+        return max(int(limit / 78 * 1.5) + 5, 7)       # ~78 5-min bars/day
+    raise ValueError(f"unsupported timeframe: {timeframe}")
+
+
 def get_bars(symbol: str, *, timeframe: str = "1Day", limit: int = 100) -> list[dict]:
-    """Fetch recent OHLCV bars. Used by Technical Analysis Agent for indicators."""
+    """Fetch recent OHLCV bars. Used by `lib.signals` for indicator inputs.
+
+    Always passes an explicit `start` date computed from `limit` — without it,
+    Alpaca's free IEX tier returns only the most recent bar.
+    """
     try:
         from alpaca.data.historical import StockHistoricalDataClient
         from alpaca.data.requests import StockBarsRequest
@@ -69,9 +89,22 @@ def get_bars(symbol: str, *, timeframe: str = "1Day", limit: int = 100) -> list[
     creds = credentials(want_live=False)
     client = StockHistoricalDataClient(creds.key_id, creds.secret)
     tf_map = {"1Day": TimeFrame.Day, "1Hour": TimeFrame.Hour, "5Min": TimeFrame.Minute}
-    req = StockBarsRequest(symbol_or_symbols=symbol, timeframe=tf_map[timeframe], limit=limit)
+
+    end_dt = datetime.now(UTC)
+    start_dt = end_dt - timedelta(days=_calendar_days_for(timeframe, limit))
+
+    req = StockBarsRequest(
+        symbol_or_symbols=symbol,
+        timeframe=tf_map[timeframe],
+        start=start_dt,
+        end=end_dt,
+        limit=limit,
+        feed="iex",  # explicit — free tier
+    )
     resp = client.get_stock_bars(req)
     bars = resp.data.get(symbol, [])
+    if len(bars) > limit:
+        bars = bars[-limit:]  # most recent N
     return [
         {
             "ts": b.timestamp.isoformat(),

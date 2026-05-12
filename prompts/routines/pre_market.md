@@ -23,7 +23,7 @@ You are running the **PRE-MARKET** routine for today's trading date (US/Eastern)
    import json
    from lib import data, signals, config
    symbols = [s["symbol"] for s in config.watchlist()["symbols"]]
-   bars = {sym: data.get_bars(sym, timeframe="1Day", limit=250) for sym in symbols}
+   bars = {sym: data.get_bars(sym, timeframe="1Day", limit=300) for sym in symbols}
    # VIX is not in the watchlist but is useful for regime — fetch separately if you have a feed.
    # For free Alpaca IEX, VIX isn't available; signals.detect_regime handles vix_value=None.
    regime = signals.detect_regime(bars["SPY"], vix_value=None)
