@@ -84,6 +84,14 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [x] Routine prompts rewritten as monitoring-only: `prompts/routines/{market_open,midday,pre_close}.md`. Hard "no new entries" rule.
 - [x] `config/routine_schedule.yaml` — three routines flipped to `enabled: true phase: v1` with explanatory header comment.
 
+### Telegram attachments instead of GitHub links — landed 2026-05-12
+
+- [x] `lib/notify.py > send_document` + `send_documents` — `sendDocument` API wrappers with 5 MB cap and mime detection. Never raises; failures logged.
+- [x] `tests/test_notify.py` — 15 tests, all mocked. Suite 114/114.
+- [x] All 8 routine prompts: notification block drops `/blob/main/<path>` URL bullets; adds `*Artifacts attached below:* <N> files` line + a Step B that calls `send_documents` with the day's report/journal/snapshot.
+
+Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on a public repo, the auto-merge action takes ~30s and fast clicks race it. Attachments sidestep both.
+
 ### Telegram bullet format + context line — landed 2026-05-12
 
 - [x] All 8 routine prompts: notification composition section rewritten with bulleted format, bold labels, mandatory `*Context:*` line populated from the audit's `approximate_input_kb`.

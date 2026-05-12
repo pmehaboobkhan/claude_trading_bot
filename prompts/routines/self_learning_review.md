@@ -30,41 +30,59 @@ LLMs are extremely prone to "explaining randomness as patterns." Below ~50 trade
 
 
 
+
+
 ## Composing the Telegram notification
 
-This routine commits to a `claude/...` feature branch (Claude Code default).
-A GitHub Action immediately fast-forward-merges that branch into `main` and
-deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
-By the time the user reads your Telegram message, the feature branch is gone.
+GitHub `/blob/main/<path>` URLs do not work reliably for our users:
+- Private repos return 404 to anyone not authenticated to GitHub in the
+  current browser (mobile is the common case).
+- Public repos race the auto-merge action by ~30 seconds; a fast click
+  hits 404 before the merge completes.
 
-**Required format: bulleted, with bold labels.** Telegram renders Markdown
-(`*bold*`) and the `•` character is a literal bullet that all clients
-handle correctly. **Do NOT send prose paragraphs** — bullets are easier
-to skim on mobile.
+**Solution: send reports as Telegram document attachments.** No GitHub
+dependency. The user reads the file inline in Telegram on any device.
 
-**Required fields, in order**, on each notification:
+### Step A — text message via `lib.notify.send`
 
-1. Header — `*[Calm Turtle] <routine title> <YYYY-MM-DD>*` on its own line.
-2. One bulleted line per metric (regime, signals, PnL, etc. — see per-routine list below).
-3. `• *Context:* ~<N> KB (cap 200 KB)` — populate N from the `approximate_input_kb`
-   you computed in the audit step (sum of `files_read[].bytes` divided by 1024).
-   This is a proxy for input-token cost, exposed so the user can spot context drift.
-4. `• *Commit:* <short SHA> (auto-merged to main)` — short SHA only; never
-   suffix with `on claude/<branch>`.
-5. Artifact links (one per line), each as
-   `*<Label>:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
-   Use `/blob/main/<path>` — these resolve once the auto-merge completes
-   (~30 seconds after push) and remain stable forever.
+Bulleted format with bold labels. `lib.notify.send()` already uses
+`parse_mode: "Markdown"` so `*bold*` and `•` render natively.
 
-**Rules:**
-- Never mention the feature branch name. Ever.
-- Notify only if action was taken or a risk event fired. Pure no-op runs
-  are logged to `logs/routine_runs/` but skip Telegram.
-- Keep each bullet under one line on a phone (~50–60 chars). Truncate
-  long thesis text and link to the full report instead.
-- Total message length under 1500 chars; Telegram caps at 4096.
+**Required bullets for `Self-learning review` (in order):**
 
-**Example for Self-learning review:**
+• *Period:* <start> → <end> (<N> trading days)
+• *Observations written:* <N>
+• *Top pattern:* <one-line summary> (N=<X>, <low/medium/high> confidence)
+• *Proposals drafted:* <N> (v1 observations-only — should be 0)
+• *Context:* ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
+• *Commit:* <short SHA> (auto-merged to main)
+• *Artifacts attached below:* <N> file(s)
+
+Rules:
+- Never mention the feature branch name.
+- Notify only on action or risk event; pure no-op runs skip Telegram entirely.
+- Each bullet under one line on a phone (~50–60 chars).
+- Total text under 1500 chars.
+
+### Step B — file attachments via `lib.notify.send_documents`
+
+After the text message succeeds, attach the artifacts produced this run:
+
+```bash
+python3 - <<'PYNOTIFY'
+from lib import notify
+delivered = notify.send_documents([
+    "reports/learning/weekly_learning_review_<YYYY-MM-DD>.md"
+])
+print(f"docs delivered: {delivered}")
+PYNOTIFY
+```
+
+Pass the paths most worth reading on a phone. Order matters — the first is
+shown most prominently in chat. Skip files that are pure JSON dumps unless
+they're tiny; markdown reports render best.
+
+### Example for `Self-learning review`
 
 ```
 *[Calm Turtle] Self-learning review 2026-05-17*
@@ -75,9 +93,11 @@ to skim on mobile.
 • *Proposals drafted:* 0 (v1 observations-only)
 • *Context:* ~24 KB (cap 200 KB)
 • *Commit:* l1m2n3o (auto-merged to main)
-
-*Report:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/learning/weekly_learning_review_2026-05-17.md
+• *Artifacts attached below:* 1 file
 ```
+
+The example shows the TEXT MESSAGE only. The attachments appear in the chat
+immediately after as native Telegram document cards the user can tap to read.
 
 ## Routine audit log (mandatory final step)
 

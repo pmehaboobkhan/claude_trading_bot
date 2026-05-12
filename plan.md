@@ -146,6 +146,23 @@ Built:
 - [x] `prompts/routines/market_open.md`, `midday.md`, `pre_close.md` — rewritten as monitoring-only with explicit "no new entries" guard, CB consultation, paper_sim integration, "commit only if action happened" semantics.
 - [x] `config/routine_schedule.yaml` — three routines flipped from `enabled: false phase: v2` to `enabled: true phase: v1`. Top-of-file comment updated.
 
+### Telegram artifacts: attachments instead of GitHub links — landed 2026-05-12
+
+GitHub `/blob/main/<path>` URLs in Telegram messages were 404-ing on the user's phone:
+- Private repo → GitHub returns 404 to anyone not authenticated in the current browser. Mobile is the common case.
+- Public repo → races the auto-merge action by ~30 seconds; a fast click hits 404 before the merge completes.
+
+Fix: **attach files directly to Telegram as document attachments.** No GitHub dependency. The user reads files inline in Telegram on any device. Files stay in the Telegram chat history forever (good audit trail).
+
+Built:
+
+- [x] `lib/notify.py > send_document(path, *, caption, filename)` — `sendDocument` API wrapper with 5 MB cap, mime-type detection, defensive error handling (returns False, never raises).
+- [x] `lib/notify.py > send_documents(paths, *, caption)` — multi-file convenience; caption attaches to the first document only.
+- [x] `tests/test_notify.py` — 15 tests, all network calls mocked. Full suite 114/114.
+- [x] All 8 routine prompts updated: notification section drops `*<Label>:* https://github.com/...` bullets entirely; adds a `*Artifacts attached below:* <N> file(s)` line and a "Step B — file attachments" block calling `send_documents`.
+
+The bulleted text-message format with the `*Context:* ~<N> KB` line stays exactly as it was. Just no more bad URLs — the artifacts come through as native Telegram document cards.
+
 ### Telegram message format — landed 2026-05-12
 
 Notifications were prose paragraphs; switched to a bulleted format with bold labels for easier mobile scan. Added a `*Context:* ~<N> KB (cap 200 KB)` line on every message so context drift is visible at a glance, not buried in audit logs.
