@@ -146,10 +146,23 @@ Built:
 - [x] `prompts/routines/market_open.md`, `midday.md`, `pre_close.md` — rewritten as monitoring-only with explicit "no new entries" guard, CB consultation, paper_sim integration, "commit only if action happened" semantics.
 - [x] `config/routine_schedule.yaml` — three routines flipped from `enabled: false phase: v2` to `enabled: true phase: v1`. Top-of-file comment updated.
 
+### Context-budget protection — landed 2026-05-12
+
+Pre-emptive guard against journals/per-symbol-histories growing unbounded over months. Two mechanisms:
+
+- [x] **Daily snapshots** (`lib/snapshots.py`, `memory/daily_snapshots/<date>.md`). end_of_day writes a ≤ 1 KB summary of the day's essentials (regime + CB state + PnL + decisions + open positions + notable + watch_tomorrow). Pre_market reads the last 5 snapshots instead of the last 5 full daily journals — ~5 KB total context vs ~50–250 KB unbounded.
+- [x] **Routine audit logs** (`lib/routine_audit.py`, `logs/routine_runs/<ts>_<routine>_audit.md`). Every routine writes a YAML audit at end with `files_read` (path + bytes), `subagent_dispatches`, `artifacts_written`, `commits`, and an `approximate_input_kb` proxy for token cost. Trended over time, surfaces drift before context blows up.
+- [x] `tests/test_snapshots.py` + `tests/test_routine_audit.py` — 33 tests including a 1-KB size guarantee for typical-day snapshots. Full suite at 99/99.
+- [x] Routine prompts updated (`pre_market`, `end_of_day`, all intraday + reviews): pre_market reads snapshots; end_of_day writes one as step 12a before compliance_safety; every routine writes an audit appendix as final step.
+
+Result: per-routine input context stays roughly constant over time. We have ~5–8x headroom under the 200k advisory cap, and the audit trail will tell us if it ever changes.
+
 ### Still open
 
-- [ ] Operator action: set up the three new routines on Claude Code web (same template as pre_market / end_of_day; cron values per `config/routine_schedule.yaml`; same `calm-turtle` environment).
+- [ ] Operator action: set up the three new intraday monitoring routines on Claude Code web (same template as pre_market / end_of_day; cron per `config/routine_schedule.yaml`; same `calm-turtle` environment).
 - [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
+- [ ] Per-symbol history compression: when `decisions/by_symbol/<SYM>.md` timeline exceeds 50 rows, Performance Review collapses older rows into a "Summary before <date>" header block. Read load stabilizes.
+- [ ] `logs/routine_runs/` auto-archive to `logs/routine_runs/archive/<year>/<month>/` after 30 days.
 - [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013).
 - [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
 - [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; consider preferring `.venv/bin/python` in the hook for portability.

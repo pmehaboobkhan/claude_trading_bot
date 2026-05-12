@@ -84,11 +84,21 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [x] Routine prompts rewritten as monitoring-only: `prompts/routines/{market_open,midday,pre_close}.md`. Hard "no new entries" rule.
 - [x] `config/routine_schedule.yaml` — three routines flipped to `enabled: true phase: v1` with explanatory header comment.
 
+### Context-budget protection — landed 2026-05-12
+
+- [x] `lib/snapshots.py` — DailySnapshot dataclass, write/read helpers, YAML frontmatter + markdown body. end_of_day writes; pre_market reads.
+- [x] `lib/routine_audit.py` — RoutineAudit dataclass + writer. YAML audit per routine run.
+- [x] `tests/test_snapshots.py` + `tests/test_routine_audit.py` — 33 tests including a 1-KB size guarantee. Full suite 99/99.
+- [x] Routine prompts wired: pre_market reads `memory/daily_snapshots/` instead of full journals; end_of_day writes today's snapshot before compliance gate; every routine writes an audit log at end.
+- [x] `memory/daily_snapshots/.gitkeep` created.
+
 ### Still open
 
 - [ ] **Operator: set up market_open, midday, pre_close on Claude Code web** — same template as the existing two routines; same `calm-turtle` environment; crons per the schedule yaml.
 - [ ] **Daily-layer ensemble/voting framework** (next 2–4 weeks). First deliverable: explicit handling for two strategies converging on the same symbol (e.g. GLD via TAA + gold_permanent_overlay).
-- [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events.
+- [ ] **Per-symbol history compression** — when `decisions/by_symbol/<SYM>.md` timeline > 50 rows, Performance Review collapses older rows into a summary header. Stabilizes context load on long-lived symbols.
+- [ ] **`logs/routine_runs/` auto-archive** to `archive/<year>/<month>/` after 30 days.
+- [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events. Also: scan `approximate_input_kb` across audit logs once a week, plot the trend.
 - [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3`. User-level `pip install jsonschema` is in place, but for portability the hook should prefer `.venv/bin/python` when present.
 - [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would stress-test recession DD.
 

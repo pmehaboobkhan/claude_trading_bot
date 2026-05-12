@@ -93,6 +93,35 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
 
 11. For every prediction made today, append to `memory/prediction_reviews/<date>.md`.
 
+
+12a. **Write today's daily snapshot** for context-budget protection of tomorrow's pre_market:
+   ```bash
+   python3 - <<'PYSNAP'
+   from lib import snapshots
+   from datetime import date
+   snap = snapshots.DailySnapshot(
+       date=date.today().isoformat(),
+       regime=<from step 4 signals output>,
+       regime_confidence=<low|medium|high>,
+       circuit_breaker_state=<from step 5>,
+       circuit_breaker_dd_pct=<from step 5>,
+       pnl_today_usd=<from step 9 performance_review>,
+       pnl_today_pct=<from step 9>,
+       open_positions_count=<from positions.json>,
+       trades_executed=<count of PAPER_BUY+PAPER_SELL+PAPER_CLOSE today>,
+       mode=<from approved_modes.yaml>,
+       decisions_made=[<up to 10 one-line summaries>],
+       open_positions=[<one-line per open position>],
+       risk_events=[<short summary of any logs/risk_events/ entries today>],
+       notable="<one paragraph; what would matter to tomorrow's pre_market>",
+       watch_tomorrow=[<up to 5 items: earnings, macro events, expiring conditions>],
+   )
+   snapshots.write_snapshot(snap)
+   PYSNAP
+   ```
+   The snapshot must stay ≤ 1 KB — keep list items terse, narrative under
+   ~3 sentences. Tomorrow's pre_market reads this instead of the full journal.
+
 12. `compliance_safety`: verify journal complete; paper log matches `positions.json`; circuit-breaker state file written.
 
 13. Commit: `eod: journal + perf <date> (PnL ±$X.XX, N trades, win rate W%, cb_state=<X>)`.
@@ -144,3 +173,38 @@ Commit: d10f9b6 (auto-merged to main)
 Report: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/pre_market/2026-05-12.md
 Journal: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/daily/2026-05-12.md
 ```
+
+## Routine audit log (mandatory final step)
+
+Before exiting (clean OR halted OR error), write one audit file via
+`lib.routine_audit`:
+
+```bash
+python3 - <<'PYAUDIT'
+from lib import routine_audit
+audit = routine_audit.RoutineAudit(
+    routine="<routine_name_snake_case>",
+    started_at="<ISO start ts>",
+    ended_at="<ISO end ts>",
+    duration_seconds=<float>,
+    exit_reason=<"clean"|"halted"|"error"|"noop">,
+    files_read=[
+        routine_audit.file_record(p)
+        for p in [<list of absolute paths you Read during this run>]
+    ],
+    subagent_dispatches={"<agent>": <count>, ...},
+    artifacts_written=[<list of repo-relative paths you Wrote>],
+    commits=[<short SHAs you created>],
+    notes="<one-line context: anything noteworthy>",
+)
+routine_audit.write_audit(audit)
+PYAUDIT
+```
+
+Why this exists: this is the only observable view of context-budget usage
+across routine runs. `approximate_input_kb` is a proxy for input-token cost
+and is trended over time. If it starts growing without bound, that's the
+signal to compress per-symbol histories or rotate memory files. Until then,
+we trust the system.
+
+The hook-written `_start.md` / `_end.md` markers are separate and unchanged.

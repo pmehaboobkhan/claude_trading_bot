@@ -13,7 +13,7 @@ You are running the **PRE-MARKET** routine for today's trading date (US/Eastern)
 3. Schema validation: run `python tests/run_schema_validation.py`. Halt on any failure with a `logs/risk_events/` entry.
 4. Load context:
    - `config/watchlist.yaml`, `config/risk_limits.yaml`, `config/strategy_rules.yaml`
-   - Last 5 `journals/daily/*.md`
+   - Last 5 `memory/daily_snapshots/<date>.md` files (one-paragraph summaries written by end_of_day — ~1 KB each, replaces reading full daily journals which can grow to 50+ KB).
    - `trades/paper/positions.json` (if exists)
    - `memory/market_regimes/current_regime.md` (if exists)
    - `memory/symbol_profiles/*.md` for each watchlist symbol (if exists)
@@ -97,3 +97,38 @@ Commit: d10f9b6 (auto-merged to main)
 Report: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/pre_market/2026-05-12.md
 Journal: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/daily/2026-05-12.md
 ```
+
+## Routine audit log (mandatory final step)
+
+Before exiting (clean OR halted OR error), write one audit file via
+`lib.routine_audit`:
+
+```bash
+python3 - <<'PYAUDIT'
+from lib import routine_audit
+audit = routine_audit.RoutineAudit(
+    routine="<routine_name_snake_case>",
+    started_at="<ISO start ts>",
+    ended_at="<ISO end ts>",
+    duration_seconds=<float>,
+    exit_reason=<"clean"|"halted"|"error"|"noop">,
+    files_read=[
+        routine_audit.file_record(p)
+        for p in [<list of absolute paths you Read during this run>]
+    ],
+    subagent_dispatches={"<agent>": <count>, ...},
+    artifacts_written=[<list of repo-relative paths you Wrote>],
+    commits=[<short SHAs you created>],
+    notes="<one-line context: anything noteworthy>",
+)
+routine_audit.write_audit(audit)
+PYAUDIT
+```
+
+Why this exists: this is the only observable view of context-budget usage
+across routine runs. `approximate_input_kb` is a proxy for input-token cost
+and is trended over time. If it starts growing without bound, that's the
+signal to compress per-symbol histories or rotate memory files. Until then,
+we trust the system.
+
+The hook-written `_start.md` / `_end.md` markers are separate and unchanged.

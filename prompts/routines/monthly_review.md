@@ -28,3 +28,38 @@ You are running the **MONTHLY REVIEW** for the month just ended.
 **Constraints**:
 - The routine never recommends advancing more than one mode-step at a time.
 - The routine NEVER recommends `LIVE_EXECUTION` directly. The most it can recommend is `LIVE_PROPOSALS`.
+
+## Routine audit log (mandatory final step)
+
+Before exiting (clean OR halted OR error), write one audit file via
+`lib.routine_audit`:
+
+```bash
+python3 - <<'PYAUDIT'
+from lib import routine_audit
+audit = routine_audit.RoutineAudit(
+    routine="<routine_name_snake_case>",
+    started_at="<ISO start ts>",
+    ended_at="<ISO end ts>",
+    duration_seconds=<float>,
+    exit_reason=<"clean"|"halted"|"error"|"noop">,
+    files_read=[
+        routine_audit.file_record(p)
+        for p in [<list of absolute paths you Read during this run>]
+    ],
+    subagent_dispatches={"<agent>": <count>, ...},
+    artifacts_written=[<list of repo-relative paths you Wrote>],
+    commits=[<short SHAs you created>],
+    notes="<one-line context: anything noteworthy>",
+)
+routine_audit.write_audit(audit)
+PYAUDIT
+```
+
+Why this exists: this is the only observable view of context-budget usage
+across routine runs. `approximate_input_kb` is a proxy for input-token cost
+and is trended over time. If it starts growing without bound, that's the
+signal to compress per-symbol histories or rotate memory files. Until then,
+we trust the system.
+
+The hook-written `_start.md` / `_end.md` markers are separate and unchanged.
