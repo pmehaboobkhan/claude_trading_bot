@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "GOOGL",
+  "decision": "PAPER_BUY",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Rank-1 by 6-month return (+35.31%) on the large-cap subset per data/market/2026-05-12/0630.json; SPY trend filter passed (above 10-month MA). large_cap_momentum_top5 ENTRY signal — top of the leaderboard with both confirmations passed and no failures.",
+  "thesis_bear": "Concentration risk if Mag-7 leadership rotates; news connector offline (news_unavailable) — regulatory/earnings catalysts unknown, treated as risk factor, not as bullish silence. Stretched momentum may mean-revert in a range_bound (low-confidence) regime.",
+  "invalidation_condition": "GOOGL falls out of the top-7 (top-5 + 2-slot buffer) on 6-month total return OR SPY breaks its 10-month MA. Hard stop also at -10% from fill price.",
+  "risk_reward": {
+    "entry": 397.83,
+    "stop": 358.047,
+    "target": 497.2875,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 15,
+    "usd": 5967.45,
+    "pct_of_account": 5.97,
+    "intended_pct": 6.0,
+    "applied_cap": "Strategy B target: 30% / 5 names = 6% per name; well under max_position_size_pct (15%); per-trade risk 0.60% under max_risk_per_trade_pct (1.5%).",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.62,
+  "confidence_notes": "Highest-rank Strategy B name; both confirmations passed. Reduced from 0.75 for news_unavailable and 6-day data lag.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "pct 5.97% under 15%; risk-per-trade 0.60% under 1.5%; sector Communication_Services unique; not in earnings window (calendar unavailable, defensive default — Mag-7 earnings typically Apr/Oct; check passes by date); R/R 2.5:1; strategy ACTIVE_PAPER_TEST; symbol approved_for_paper_trading=true.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "PAPER_BUY allowed under PAPER_TRADING mode; schema-compliant; bull/bear/invalidation all present.",
+  "human_approval_required": false,
+  "final_status": "PAPER_FILLED",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "large_cap_momentum_top5",
+    "signal_action": "ENTRY",
+    "signal_rationale": "large_cap_momentum_top5: ENTRY — in top-5, SPY trend up",
+    "signal_inputs": {"return_6m": 0.3531, "rank": 1, "universe_size": 21, "spy_above_ma": true},
+    "last_bar_ts": "2026-05-06T04:00:00+00:00"
+  }
+}

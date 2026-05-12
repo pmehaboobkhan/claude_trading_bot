@@ -1,0 +1,6 @@
+timestamp,symbol,side,quantity,simulated_price,rationale_link,stop_loss,take_profit,status,realized_pnl,notes
+2026-05-12T20:02:25.322259+00:00,GLD,BUY,34,430.7861,decisions/2026-05-12/2000_GLD.json,387.63,538.375,OPEN,-0.0,strategy=dual_momentum_taa; rank=top-1; 12m_ret=+38.56%; cb=FULL
+2026-05-12T20:02:25.322596+00:00,GOOGL,BUY,15,397.9096,decisions/2026-05-12/2000_GOOGL.json,358.047,497.2875,OPEN,-0.0,strategy=large_cap_momentum_top5; rank=1; 6m_ret=+35.31%; cb=FULL
+2026-05-12T20:02:25.322869+00:00,XOM,BUY,40,148.6497,decisions/2026-05-12/2000_XOM.json,133.758,185.775,OPEN,-0.0,strategy=large_cap_momentum_top5; rank=2; 6m_ret=+33.58%; cb=FULL
+2026-05-12T20:02:25.323129+00:00,CSCO,BUY,65,91.6483,decisions/2026-05-12/2000_CSCO.json,82.467,114.5375,OPEN,-0.0,strategy=large_cap_momentum_top5; rank=3; 6m_ret=+25.29%; cb=FULL
+2026-05-12T20:02:25.323367+00:00,WMT,BUY,46,130.116,decisions/2026-05-12/2000_WMT.json,117.081,162.6125,OPEN,-0.0,strategy=large_cap_momentum_top5; rank=4; 6m_ret=+24.30%; cb=FULL

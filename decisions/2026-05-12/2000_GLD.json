@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "GLD",
+  "decision": "PAPER_BUY",
+  "strategy": "dual_momentum_taa",
+  "thesis_bull": "GLD has the highest 12-month total return in the macro basket (+38.56% vs SPY +34.44%, IEF +1.19%) per deterministic snapshot data/market/2026-05-12/0630.json, is above its 210-day MA, and is selected as the top-1 risk asset by dual_momentum_taa. Also satisfies gold_permanent_overlay (Strategy C) — the two strategies agree on the same symbol, so this single position covers both allocations.",
+  "thesis_bear": "Gold at +38.56% 12m has stretched momentum and can mean-revert sharply if the dollar firms or real rates rise. News connector offline (news_unavailable) — company/macro catalysts unknown, treated as a risk factor per CLAUDE.md > Handling missing data, not as bullish silence. Latest bar date 2026-05-06 (6-day Alpaca IEX tier lag) means we are sizing on a price that may differ from the true 2026-05-12 close.",
+  "invalidation_condition": "GLD closes below its 210-day MA OR is outranked by SPY/IEF on 12-month total return at the next monthly check. Hard stop also at -10% from fill price.",
+  "risk_reward": {
+    "entry": 430.70,
+    "stop": 387.63,
+    "target": 538.375,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 34,
+    "usd": 14643.80,
+    "pct_of_account": 14.64,
+    "intended_pct": 15.0,
+    "strategy_a_intended_pct": 60.0,
+    "strategy_c_intended_pct": 10.0,
+    "applied_cap": "max_risk_per_trade_pct=1.5 with default_stop_loss_pct=10.0 -> position capped at 15% of account; Strategy A's 60% intent is reduced to satisfy the per-trade risk budget; Strategy C's 10% overlay subsumed by the same line item (do not double-count).",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.62,
+  "confidence_notes": "Deterministic top-1 by 12m + 210d MA confirmation. Reduced from 0.75 because news connector is offline (no company/macro catalyst awareness) and data is 6 days stale.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "Per-position pct (14.64%) under macro_etf cap (60%) AND under max_position_size_pct (15%); per-trade risk = 14.64% * 10% stop = 1.46% under max_risk_per_trade_pct (1.5%); sector Commodity_Gold unique among new opens; not in earnings window (commodity ETF); R/R 2.5:1 above min 1.5; strategy dual_momentum_taa is ACTIVE_PAPER_TEST; symbol approved_for_paper_trading=true.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "Decision class PAPER_BUY permitted under mode PAPER_TRADING. No live order path. Bull/bear/invalidation present. Schema-compliant. Subagent dispatch within cap.",
+  "human_approval_required": false,
+  "final_status": "PAPER_FILLED",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "dual_momentum_taa",
+    "signal_action": "ENTRY",
+    "signal_rationale": "dual_momentum_taa: ENTRY — top-1 risk asset, all filters passed",
+    "last_bar_ts": "2026-05-06T04:00:00+00:00",
+    "data_freshness_note": "Alpaca free IEX tier lag; 6m/12m momentum is tolerant of T-N timestamps. Live-execution staleness rule (60s) does NOT apply because we are in PAPER_TRADING mode using daily-bar momentum signals."
+  }
+}

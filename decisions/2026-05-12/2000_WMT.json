@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "WMT",
+  "decision": "PAPER_BUY",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Rank-4 by 6-month return (+24.30%) per data/market/2026-05-12/0630.json; SPY trend filter passed. Defensive consumer-staples exposure uncorrelated with tech / energy / commodity — best diversifier in this slate.",
+  "thesis_bear": "Defensive momentum can fade rapidly if growth picks back up and rotation moves into cyclicals. News connector offline.",
+  "invalidation_condition": "WMT falls out of top-7 by 6m return OR SPY breaks 10-month MA. Hard stop at -10%.",
+  "risk_reward": {
+    "entry": 130.09,
+    "stop": 117.081,
+    "target": 162.6125,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 46,
+    "usd": 5984.14,
+    "pct_of_account": 5.98,
+    "intended_pct": 6.0,
+    "applied_cap": "Strategy B 6%; under max_position_size_pct (15%); risk 0.60% under max_risk_per_trade_pct (1.5%).",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.58,
+  "confidence_notes": "Rank-4 momentum; defensive sector adds diversification value; slight cut for rotation risk if cyclicals lead.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "pct 5.98% under 15%; risk 0.60% under 1.5%; sector Consumer_Staples unique; R/R 2.5:1; ACTIVE_PAPER_TEST; approved_for_paper_trading=true.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "PAPER_BUY allowed; schema-compliant.",
+  "human_approval_required": false,
+  "final_status": "PAPER_FILLED",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "large_cap_momentum_top5",
+    "signal_action": "ENTRY",
+    "signal_rationale": "large_cap_momentum_top5: ENTRY — in top-5, SPY trend up",
+    "signal_inputs": {"return_6m": 0.2430, "rank": 4, "universe_size": 21, "spy_above_ma": true},
+    "last_bar_ts": "2026-05-06T04:00:00+00:00"
+  }
+}
