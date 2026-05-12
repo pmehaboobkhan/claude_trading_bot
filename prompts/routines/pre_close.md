@@ -1,23 +1,56 @@
-# Pre-Close Routine — production prompt
+# Pre-Close Routine — production prompt (v1, monitoring-only)
 
-> Scheduled 15:30 ET, Mon–Fri. Use the `orchestrator` subagent.
+> Scheduled 15:30 ET, Mon–Fri (30 minutes before close). Use the `orchestrator` subagent. **Monitoring routine — does NOT open new positions.**
 
-You are running the **PRE-CLOSE** routine.
+## v1 scope
+The pre_close routine prepares the book for overnight risk. Its job is to:
+
+1. Refresh circuit-breaker state with late-day equity.
+2. Health check on every open position against late-day quotes (catches positions that drifted toward stops late in the session).
+3. **Overnight-risk scan**: any open position with a known catalyst tomorrow (earnings AMC/BMO within `risk_limits.yaml`-equivalent window, scheduled macro event tomorrow)?
+4. Propose `PAPER_CLOSE` for positions that should not hold overnight.
+5. **NEVER call `paper_sim.open_position()`.** Even if a great signal appears late-day, entries are committed to EOD prices, not 15:30.
+
+## Steps
 
 1. Comply with `CLAUDE.md`.
-2. Mode check + schema validation.
-3. Load: open positions, today's decisions, today's PnL, regime memory.
-4. `market_data`: end-of-day quotes for open positions.
-5. `portfolio_manager`: hold-vs-close decision per open position.
-   - If `mode != PAPER_TRADING`: log only; do not act.
-   - If invalidation triggered or time-stop reached → `PAPER_CLOSE`.
-   - If overnight risk (top-holding earnings tomorrow within `holding_earnings_caution_window_days`, scheduled macro event) → propose `PAPER_CLOSE`.
-6. Route each proposal through `risk_manager` → `compliance_safety`.
-7. Apply approved closes to paper log.
-8. Append `## Pre-close` section to today's daily journal.
-9. Commit: `pre-close: N hold, M close decisions`.
-10. Notify with a short summary if any action was taken.
+2. Mode check; halt if `HALTED`.
+3. Schema validation.
+4. Load: `trades/paper/positions.json`, today's `decisions/<date>/`, today's daily PnL, regime memory.
+5. **Skip if no open positions** — write `logs/routine_runs/<ts>_pre_close_noop.md` and exit.
+6. Fetch late-day quotes + account snapshot.
+7. Circuit-breaker refresh. Transition → log + URGENT.
+8. **Standard health check** via `lib.portfolio_health` (stop/target).
+9. **Overnight-risk overlay**:
+   - Dispatch `fundamental_context` to identify whether any ETF's top-holding has earnings within the next trading day, OR whether any individual stock holding has its own earnings within the next trading day.
+   - Dispatch `macro_sector` to surface any scheduled macro events for the next session (FOMC decision, NFP, CPI, GDP, retail sales — the calendar-A list).
+   - Combine: any open position with material overnight risk → propose `PAPER_CLOSE` with reason `overnight_risk: <event>`.
+10. Each proposed close routes through `trade_proposal` → `risk_manager` → `compliance_safety`. On approval + `PAPER_TRADING` mode → `lib.paper_sim.close_position(...)`.
+11. Reconcile.
+12. Append a `## Pre-close` section to today's daily journal. Include the list of held-overnight positions with one-line risk justifications.
+13. Commit if any action happened (or any overnight-risk flag was raised, even if held). Pure no-op → log marker, skip commit.
+14. Notify Telegram with a short summary: holding N overnight, closing M, top reason.
 
-**Constraints**:
-- We do NOT chase end-of-day moves. Closes are driven by invalidation/risk, not chart-watching.
-- NO new positions opened pre-close.
+## Constraints
+- No new entries.
+- We do not chase end-of-day moves. Closes are driven by invalidation or overnight risk, not by intraday chart-watching.
+- "Earnings within the next trading day" is per `risk_limits.yaml > holding_earnings_caution_window_days` (equivalent — currently informally 1 day). Be conservative: if uncertain whether earnings are AMC vs next-day BMO, treat as next-trading-day exposure.
+- Top-holding earnings for an ETF (e.g., NVDA earnings on XLK) count if the holding is ≥ 20% of the ETF — `fundamental_context` knows this.
+- NO live execution.
+
+## Why this routine matters more than midday
+The asymmetry of overnight risk is real: a position held overnight is exposed to ~16 hours of macro and earnings news with no ability to react. Closing pre-emptively pays a small expected-value cost in exchange for capping tail risk on the events we can see coming. The EOD routine will re-evaluate fresh entries on closing prices; nothing closed at pre_close is locked out — it just gets re-considered with the latest signal.
+
+
+## Composing the Telegram notification
+
+This routine commits to a `claude/...` feature branch (Claude Code default).
+A GitHub Action immediately fast-forward-merges that branch into `main`
+and deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+By the time the user reads your Telegram message, the feature branch no
+longer exists.
+
+- Artifact links: use `https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
+- Commits: cite the short SHA only. Do not suffix with the branch name.
+- Status: "auto-merged to main" or omit branch info.
+- Notify only if action was taken (a close, a risk event, a regime call) — pure no-ops are logged but not pushed to Telegram.

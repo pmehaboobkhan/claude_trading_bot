@@ -129,11 +129,30 @@ The first cloud-routine run produced a "data insufficiency" risk event because `
 
 The first run's behavior was actually a good safety-design confirmation: the system correctly identified data insufficiency, emitted a risk event, returned NO_TRADE for A and B, and only Strategy C (history-independent gold overlay) emitted an ENTRY. Compliance approved; nothing went to Alpaca that shouldn't have.
 
+### Intraday monitoring routines — landed 2026-05-12
+
+Following the agreed phased plan (monitoring this week → daily ensemble next 2–4 weeks → intraday alpha only after baseline evidence), the three intraday routines are activated as **monitoring-only** layers:
+
+- `market_open` (09:35 ET) — refresh circuit-breaker with opening equity; detect overnight gaps that breached stops/targets; propose closes only.
+- `midday` (12:00 ET) — refresh CB; news scan limited to symbols with open positions; propose closes on news-driven invalidation.
+- `pre_close` (15:30 ET) — refresh CB; overnight-risk overlay (earnings tomorrow on holdings, scheduled macro events for next session); close positions facing material overnight exposure.
+
+**Hard rule across all three**: no new entries. ENTRY signals from `lib.signals` are only acted on by `end_of_day` against closing prices — that is where backtest evidence lives. EXITs are never throttled by the circuit-breaker (closing reduces risk).
+
+Built:
+
+- [x] `lib/portfolio_health.py` — pure per-position assessment (`PositionHealth` dataclass, `assess_positions`, `positions_to_close`, `health_as_dict`). Stop/target detection for long and short; raises on missing quotes (forces stale-data alerts).
+- [x] `tests/test_portfolio_health.py` — 15 tests covering long/short, stops, targets, no-stop positions, mixed books, error paths, serialization. Full suite at 66/66.
+- [x] `prompts/routines/market_open.md`, `midday.md`, `pre_close.md` — rewritten as monitoring-only with explicit "no new entries" guard, CB consultation, paper_sim integration, "commit only if action happened" semantics.
+- [x] `config/routine_schedule.yaml` — three routines flipped from `enabled: false phase: v2` to `enabled: true phase: v1`. Top-of-file comment updated.
+
 ### Still open
 
-- [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013 because META IPO 2012).
+- [ ] Operator action: set up the three new routines on Claude Code web (same template as pre_market / end_of_day; cron values per `config/routine_schedule.yaml`; same `calm-turtle` environment).
+- [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
+- [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013).
 - [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
-- [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; user-level `pip install jsonschema` is in place but consider preferring `.venv/bin/python` in the hook for portability.
+- [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; consider preferring `.venv/bin/python` in the hook for portability.
 
 ### Files materially changed today
 - `lib/signals.py` — three new strategy functions; `STRATEGY_FUNCS` dispatcher; TAA risk-asset set; deterministic.

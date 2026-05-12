@@ -2,10 +2,19 @@ schema_version: 1
 timezone: America/New_York
 trading_days_only: true
 
-# v1 active routines: pre_market + end_of_day only.
-# Other routines are scaffolded for v2; they MUST NOT be activated until the
-# Self-Learning Agent reaches v2 mode AND a backtest exists for every ACTIVE_PAPER_TEST
-# strategy in strategy_rules.yaml. See plan.md > Implementation Roadmap.
+# v1 active routines (as of 2026-05-12):
+#   pre_market           — research only (no entries)
+#   market_open          — MONITORING only (no new entries)
+#   midday               — MONITORING only (no new entries)
+#   pre_close            — MONITORING only (no new entries, scans overnight risk)
+#   end_of_day           — paper-trade decision point (the only routine that opens positions)
+#   self_learning_review — observations-only
+#
+# Intraday routines (market_open / midday / pre_close) are monitoring layers — they consult
+# `lib.portfolio_health` and `lib.portfolio_risk` to refresh the circuit-breaker and propose
+# closes when stops/targets/overnight-risk triggers fire. They MUST NOT open new positions.
+# Entry signals from `lib.signals` are only acted on by `end_of_day` against closing prices.
+# See plan.md > "Intraday monitoring routines — landed 2026-05-12".
 routines:
   pre_market:
     cron: "30 6 * * 1-5"      # 06:30 ET, Mon-Fri
@@ -25,22 +34,22 @@ routines:
     cron: "35 9 * * 1-5"      # 09:35 ET (5 min after open)
     prompt: prompts/routines/market_open.md
     halt_on_error: false
-    enabled: false
-    phase: v2
+    enabled: true
+    phase: v1
 
   midday:
     cron: "0 12 * * 1-5"      # 12:00 ET
     prompt: prompts/routines/midday.md
     halt_on_error: false
-    enabled: false
-    phase: v2
+    enabled: true
+    phase: v1
 
   pre_close:
     cron: "30 15 * * 1-5"     # 15:30 ET
     prompt: prompts/routines/pre_close.md
     halt_on_error: false
-    enabled: false
-    phase: v2
+    enabled: true
+    phase: v1
 
   weekly_review:
     cron: "0 9 * * 6"         # Saturday 09:00 ET

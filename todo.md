@@ -77,8 +77,17 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [ ] Manual `Run now` of `pre_market` first; verify Telegram fires and a commit lands.
 - [ ] Let `pre_market` and `end_of_day` run automatically for one full trading day.
 
+### Intraday monitoring routines — landed 2026-05-12
+
+- [x] `lib/portfolio_health.py` — per-position assessment (`PositionHealth`, `assess_positions`, `positions_to_close`).
+- [x] `tests/test_portfolio_health.py` — 15 tests (full suite 66/66).
+- [x] Routine prompts rewritten as monitoring-only: `prompts/routines/{market_open,midday,pre_close}.md`. Hard "no new entries" rule.
+- [x] `config/routine_schedule.yaml` — three routines flipped to `enabled: true phase: v1` with explanatory header comment.
+
 ### Still open
 
+- [ ] **Operator: set up market_open, midday, pre_close on Claude Code web** — same template as the existing two routines; same `calm-turtle` environment; crons per the schedule yaml.
+- [ ] **Daily-layer ensemble/voting framework** (next 2–4 weeks). First deliverable: explicit handling for two strategies converging on the same symbol (e.g. GLD via TAA + gold_permanent_overlay).
 - [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events.
 - [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3`. User-level `pip install jsonschema` is in place, but for portability the hook should prefer `.venv/bin/python` when present.
 - [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would stress-test recession DD.
