@@ -1,0 +1,22 @@
+{
+  "fetched_at_utc": "2026-05-12T11:30:00+00:00",
+  "routine": "pre_market",
+  "date": "2026-05-12",
+  "status": "news_unavailable",
+  "reason": "No news connector wired into v1 (lib has no news module). Per CLAUDE.md handling-missing-data rule: 'News connector down -> mark symbols news_unavailable; treat as risk factor, not as no news = bullish.'",
+  "per_symbol": {
+    "SPY":  {"status": "news_unavailable"},
+    "GLD":  {"status": "news_unavailable"},
+    "IEF":  {"status": "news_unavailable"},
+    "SHV":  {"status": "news_unavailable"},
+    "GOOGL":{"status": "news_unavailable"},
+    "XOM":  {"status": "news_unavailable"},
+    "CSCO": {"status": "news_unavailable"},
+    "WMT":  {"status": "news_unavailable"},
+    "JNJ":  {"status": "news_unavailable"},
+    "AMZN": {"status": "news_unavailable"},
+    "NVDA": {"status": "news_unavailable"}
+  },
+  "macro": {"status": "news_unavailable"},
+  "sector": {"status": "news_unavailable"}
+}
