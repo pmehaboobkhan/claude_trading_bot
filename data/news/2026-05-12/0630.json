@@ -1,0 +1,11 @@
+{
+  "as_of": "2026-05-12T06:30:00-04:00",
+  "trading_date": "2026-05-12",
+  "window_hours": 24,
+  "source": "none_configured",
+  "status": "news_unavailable",
+  "note": "No news connector configured in v1 paper-trading environment. Per CLAUDE.md handling-missing-data rules, this is treated as a risk factor (be more conservative), not as 'no news = bullish'. No news-driven theses or invalidations are claimed below.",
+  "symbol_headlines": {},
+  "sector_headlines": {},
+  "macro_headlines": {}
+}
