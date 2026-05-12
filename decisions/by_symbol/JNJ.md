@@ -16,3 +16,9 @@
 - Outcome: NO_TRADE — deferred by max_trades_per_day=5 cap (first 5 opens consumed today's budget for GLD, GOOGL, XOM, CSCO, WMT). Will reconsider next routine if signal still confirms.
 - Routine: end_of_day_2026-05-12, mode PAPER_TRADING, cb_state=FULL, throttle=1.0
 - Risk Manager: REJECTED (limit binding). Compliance: APPROVED (NO_TRADE always permissible).
+
+## 2026-05-12 — EOD re-run (20:40Z, deferred again)
+
+- Routine: end_of_day_2026-05-12 (scheduled 16:30 ET re-run)
+- Signal: ENTRY re-confirmed (rank 5/21, +20.17% 6m, SPY trend up).
+- Outcome: still NO_TRADE — `max_trades_per_day=5` cap remains binding (5/5 used by morning opens). No new decision file written this re-run; the 20:00Z NO_TRADE record remains the authoritative entry. Re-evaluate at tomorrow's pre-market with a fresh daily-trade budget.

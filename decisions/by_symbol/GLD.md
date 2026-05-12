@@ -23,3 +23,11 @@
 
 - Decision file: `decisions/2026-05-12/2000_GLD_overlay_note.json`
 - Rationale: Overlay's 10% allocation is fully covered by Strategy A's 15% GLD position above. No additional shares opened (no double-booking).
+
+## 2026-05-12 — EOD re-run (20:40Z, no trade)
+
+- Routine: end_of_day_2026-05-12 (scheduled 16:30 ET re-run)
+- Signal: ENTRY re-confirmed (top-1 in Strategy A; +38.56% 12m; above 210d MA). Strategy C overlay also re-confirms (subsumed).
+- Position held; no fill, no close.
+- Mark (2026-05-07 bar close): $431.67. Unrealized PnL: +$30.05 (+0.21%).
+- cb_state=FULL, throttle=1.0; equity peak $99,992.31 unchanged.

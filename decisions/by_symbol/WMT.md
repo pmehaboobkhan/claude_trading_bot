@@ -18,3 +18,11 @@
 - Sizing: 6% of $100k (Strategy B)
 - Routine: end_of_day_2026-05-12, mode PAPER_TRADING, cb_state=FULL, throttle=1.0
 - Risk Manager: APPROVED. Compliance: APPROVED.
+
+## 2026-05-12 — EOD re-run (20:40Z, no trade)
+
+- Routine: end_of_day_2026-05-12 (scheduled 16:30 ET re-run)
+- Signal: ENTRY re-confirmed (rank 4/21, +24.30% 6m, SPY trend up).
+- Position held; no fill, no close.
+- Mark (2026-05-07 bar close): $130.24. Unrealized PnL: +$5.70 (+0.10%).
+- cb_state=FULL, throttle=1.0.
