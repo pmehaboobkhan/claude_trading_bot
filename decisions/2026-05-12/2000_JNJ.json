@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "JNJ",
+  "decision": "NO_TRADE",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Rank-5 by 6-month return (+20.17%) per data/market/2026-05-12/0630.json; SPY trend filter passed. JNJ is a valid large_cap_momentum_top5 ENTRY by the deterministic signal evaluator and adds Health_Care diversification within Strategy B.",
+  "thesis_bear": "Lowest-ranked among today's 5 ENTRY candidates for Strategy B; would push today's trade count to 6 (1 GLD + 5 B-names) above the max_trades_per_day=5 cap in config/risk_limits.yaml.",
+  "invalidation_condition": "JNJ falls out of top-7 by 6m return OR SPY breaks 10-month MA. If still confirming tomorrow, re-evaluate for the next routine's trade budget.",
+  "risk_reward": {
+    "entry": 224.48,
+    "stop": 202.032,
+    "target": 280.60,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 0,
+    "usd": 0,
+    "pct_of_account": 0,
+    "intended_pct": 6.0,
+    "applied_cap": "max_trades_per_day=5 binding (already 5 opens this routine); position size set to 0 by the cap, not by the strategy.",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.55,
+  "confidence_notes": "Signal is valid but trade is deferred due to daily-trade-count cap, not signal weakness.",
+  "risk_manager_verdict": "REJECTED",
+  "risk_manager_notes": "max_trades_per_day=5 cap reached after the first 5 opens (GLD, GOOGL, XOM, CSCO, WMT). Reject this opening per limits; will reconsider tomorrow if signal still confirms. Per CLAUDE.md > Prohibited actions: never raise risk limits.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "NO_TRADE is always permissible; preserves capital. Bull/bear/invalidation present.",
+  "human_approval_required": false,
+  "final_status": "NO_TRADE",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "large_cap_momentum_top5",
+    "signal_action": "ENTRY",
+    "signal_rationale": "large_cap_momentum_top5: ENTRY — in top-5, SPY trend up (deferred by routine-level trade cap, not by signal)",
+    "signal_inputs": {"return_6m": 0.2017, "rank": 5, "universe_size": 21, "spy_above_ma": true},
+    "last_bar_ts": "2026-05-06T04:00:00+00:00"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "GLD",
+  "decision": "NO_TRADE",
+  "strategy": "gold_permanent_overlay",
+  "thesis_bull": "gold_permanent_overlay policy mandates a permanent 10% GLD allocation as a crisis/inflation diversifier. Deterministic ENTRY signal fired (Permanent allocation policy confirmation passed).",
+  "thesis_bear": "Strategy A (dual_momentum_taa) already opened a 15% GLD position in decisions/2026-05-12/2000_GLD.json. Stacking a second GLD trade would double-count exposure to a single line item and violate the pre-market reconciliation note 'do not double-count; the larger of the two governs.'",
+  "invalidation_condition": "If Strategy A exits GLD on a future routine (e.g., GLD drops below 210d MA or is outranked), then the 10% Strategy C overlay must be re-opened as a standalone position. Monitor at next EOD.",
+  "risk_reward": {
+    "entry": 430.70,
+    "stop": 387.63,
+    "target": 538.375,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 0,
+    "usd": 0,
+    "pct_of_account": 0,
+    "intended_pct": 10.0,
+    "applied_cap": "Subsumed by Strategy A's GLD position at 15% — single GLD line item already exceeds Strategy C's 10% target. No additional shares opened.",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.62,
+  "confidence_notes": "Policy is unambiguous; the only reason this is NO_TRADE is the overlap with Strategy A.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "Reconciliation overlap: GLD already opened at 14.64% of account via Strategy A; Strategy C's 10% target is satisfied (and exceeded) by that single position. Opening additional shares would double-book the same symbol — disallowed by sanity. Per CLAUDE.md (avoid double-counting overlapping allocations).",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "NO_TRADE always permissible; preserves capital and audit clarity.",
+  "human_approval_required": false,
+  "final_status": "NO_TRADE",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "gold_permanent_overlay",
+    "signal_action": "ENTRY",
+    "signal_rationale": "gold_permanent_overlay: ENTRY — permanent 10% GLD allocation (subsumed by Strategy A's GLD position)",
+    "last_bar_ts": "2026-05-06T04:00:00+00:00",
+    "related_decision": "decisions/2026-05-12/2000_GLD.json"
+  }
+}

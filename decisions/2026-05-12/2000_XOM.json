@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-12T20:00:57Z",
+  "routine_id": "end_of_day_2026-05-12",
+  "symbol": "XOM",
+  "decision": "PAPER_BUY",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Rank-2 by 6-month return (+33.58%) per data/market/2026-05-12/0630.json; SPY trend filter passed. Energy sector exposure adds correlation diversification within Strategy B vs tech-heavy top of the leaderboard.",
+  "thesis_bear": "Energy momentum tracks commodity prices; a soft-landing growth slowdown could pull oil and XOM down quickly. News connector offline — catalysts unknown. Range_bound regime is unfriendly to leveraged commodity beta.",
+  "invalidation_condition": "XOM falls out of top-7 by 6m return OR SPY breaks 10-month MA. Hard stop at -10% from fill price.",
+  "risk_reward": {
+    "entry": 148.62,
+    "stop": 133.758,
+    "target": 185.775,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 40,
+    "usd": 5944.80,
+    "pct_of_account": 5.94,
+    "intended_pct": 6.0,
+    "applied_cap": "Strategy B 6% per name; under max_position_size_pct (15%); risk 0.59% under max_risk_per_trade_pct (1.5%).",
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0
+  },
+  "confidence_score": 0.60,
+  "confidence_notes": "Rank-2 momentum, both confirmations passed. Slight cut from 0.62 because energy beta is regime-sensitive.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "pct 5.94% under 15%; risk 0.59% under 1.5%; sector Energy unique among new opens; R/R 2.5:1; ACTIVE_PAPER_TEST; approved_for_paper_trading=true.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "PAPER_BUY allowed; schema-compliant.",
+  "human_approval_required": false,
+  "final_status": "PAPER_FILLED",
+  "data_provenance": {
+    "snapshot": "data/market/2026-05-12/0630.json",
+    "signal_strategy": "large_cap_momentum_top5",
+    "signal_action": "ENTRY",
+    "signal_rationale": "large_cap_momentum_top5: ENTRY — in top-5, SPY trend up",
+    "signal_inputs": {"return_6m": 0.3358, "rank": 2, "universe_size": 21, "spy_above_ma": true},
+    "last_bar_ts": "2026-05-06T04:00:00+00:00"
+  }
+}
