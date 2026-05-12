@@ -1,0 +1,460 @@
+{
+  "fetched_ts_utc": "2026-05-12T15:51:18.717842+00:00",
+  "date": "2026-05-12",
+  "routine": "pre_market",
+  "source": "lib/data.get_latest_quote + lib/data.get_bars (Alpaca IEX free tier)",
+  "max_data_staleness_seconds": 60,
+  "symbols": {
+    "SPY": {
+      "quote": {
+        "bid": 732.89,
+        "ask": 733.12,
+        "last_price": 733.12,
+        "volume": 160,
+        "quote_ts": "2026-05-12T15:51:19.291427+00:00",
+        "fetched_ts": "2026-05-12T15:51:19.343348+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.053018,
+      "stale": false,
+      "last_close": 733.77,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1751660,
+      "prior_close": 723.71,
+      "pct_change_vs_prior_close": 1.390059554241332
+    },
+    "IEF": {
+      "quote": {
+        "bid": 94.38,
+        "ask": 94.39,
+        "last_price": 94.39,
+        "volume": 24500,
+        "quote_ts": "2026-05-12T15:51:16.763954+00:00",
+        "fetched_ts": "2026-05-12T15:51:19.536543+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 2.773705,
+      "stale": false,
+      "last_close": 94.985,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 229764,
+      "prior_close": 94.525,
+      "pct_change_vs_prior_close": 0.48664374504098784
+    },
+    "TLT": {
+      "quote": {
+        "bid": 85.1,
+        "ask": 85.11,
+        "last_price": 85.11,
+        "volume": 16100,
+        "quote_ts": "2026-05-12T15:51:18.652105+00:00",
+        "fetched_ts": "2026-05-12T15:51:19.720127+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 1.068917,
+      "stale": false,
+      "last_close": 86.09,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 890607,
+      "prior_close": 85.425,
+      "pct_change_vs_prior_close": 0.7784606379865453
+    },
+    "GLD": {
+      "quote": {
+        "bid": 428.1,
+        "ask": 428.32,
+        "last_price": 428.32,
+        "volume": 160,
+        "quote_ts": "2026-05-12T15:51:19.717102+00:00",
+        "fetched_ts": "2026-05-12T15:51:19.885972+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.169578,
+      "stale": false,
+      "last_close": 430.7,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 164317,
+      "prior_close": 418.07,
+      "pct_change_vs_prior_close": 3.0210251871696117
+    },
+    "SHV": {
+      "quote": {
+        "bid": 110.18,
+        "ask": 110.19,
+        "last_price": 110.19,
+        "volume": 59800,
+        "quote_ts": "2026-05-12T15:50:37.969720+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.044493+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 42.076118,
+      "stale": false,
+      "last_close": 110.12,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 77994,
+      "prior_close": 110.11,
+      "pct_change_vs_prior_close": 0.00908182726365009
+    },
+    "AAPL": {
+      "quote": {
+        "bid": 293.85,
+        "ask": 293.88,
+        "last_price": 293.88,
+        "volume": 160,
+        "quote_ts": "2026-05-12T15:51:20.139886+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.215861+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.077028,
+      "stale": false,
+      "last_close": 287.46,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1379120,
+      "prior_close": 284.18,
+      "pct_change_vs_prior_close": 1.1541980434935508
+    },
+    "MSFT": {
+      "quote": {
+        "bid": 407.0,
+        "ask": 408.86,
+        "last_price": 408.86,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:15.195822+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.400629+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 5.205973,
+      "stale": false,
+      "last_close": 413.82,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 764621,
+      "prior_close": 411.33,
+      "pct_change_vs_prior_close": 0.605353365910585
+    },
+    "GOOGL": {
+      "quote": {
+        "bid": 387.72,
+        "ask": 388.64,
+        "last_price": 388.64,
+        "volume": 400,
+        "quote_ts": "2026-05-12T15:51:20.543809+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.571780+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.029062,
+      "stale": false,
+      "last_close": 397.83,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1071518,
+      "prior_close": 388.41,
+      "pct_change_vs_prior_close": 2.4252722638448954
+    },
+    "AMZN": {
+      "quote": {
+        "bid": 264.53,
+        "ask": 264.58,
+        "last_price": 264.58,
+        "volume": 300,
+        "quote_ts": "2026-05-12T15:51:20.552325+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.728207+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.176923,
+      "stale": false,
+      "last_close": 274.98,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1873707,
+      "prior_close": 273.555,
+      "pct_change_vs_prior_close": 0.5209190108022195
+    },
+    "NVDA": {
+      "quote": {
+        "bid": 217.16,
+        "ask": 217.2,
+        "last_price": 217.2,
+        "volume": 500,
+        "quote_ts": "2026-05-12T15:51:20.956864+00:00",
+        "fetched_ts": "2026-05-12T15:51:20.913344+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": -0.042395,
+      "stale": false,
+      "last_close": 207.67,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 6398711,
+      "prior_close": 196.5,
+      "pct_change_vs_prior_close": 5.684478371501266
+    },
+    "META": {
+      "quote": {
+        "bid": 600.52,
+        "ask": 601.35,
+        "last_price": 601.35,
+        "volume": 120,
+        "quote_ts": "2026-05-12T15:51:21.033946+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.079301+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.046319,
+      "stale": false,
+      "last_close": 612.615,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 519909,
+      "prior_close": 604.92,
+      "pct_change_vs_prior_close": 1.2720690339218494
+    },
+    "TSLA": {
+      "quote": {
+        "bid": 426.0,
+        "ask": 426.99,
+        "last_price": 426.99,
+        "volume": 240,
+        "quote_ts": "2026-05-12T15:51:21.166095+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.280796+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.115865,
+      "stale": false,
+      "last_close": 398.58,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 823260,
+      "prior_close": 389.29,
+      "pct_change_vs_prior_close": 2.386395746101868
+    },
+    "JPM": {
+      "quote": {
+        "bid": 298.0,
+        "ask": 315.69,
+        "last_price": 315.69,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:21.353340+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.440155+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.087975,
+      "stale": false,
+      "last_close": 314.865,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 227228,
+      "prior_close": 309.36,
+      "pct_change_vs_prior_close": 1.7794802172226516
+    },
+    "BAC": {
+      "quote": {
+        "bid": 50.58,
+        "ask": 50.59,
+        "last_price": 50.59,
+        "volume": 3800,
+        "quote_ts": "2026-05-12T15:51:20.906438+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.604783+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.699342,
+      "stale": false,
+      "last_close": 53.57,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1355257,
+      "prior_close": 53.13,
+      "pct_change_vs_prior_close": 0.828157349896476
+    },
+    "V": {
+      "quote": {
+        "bid": 327.38,
+        "ask": 328.0,
+        "last_price": 328.0,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:15.042702+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.774978+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 6.733513,
+      "stale": false,
+      "last_close": 318.73,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 450787,
+      "prior_close": 322.09,
+      "pct_change_vs_prior_close": -1.0431866869508388
+    },
+    "MA": {
+      "quote": {
+        "bid": 503.4,
+        "ask": 509.0,
+        "last_price": 509.0,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:50:54.389577+00:00",
+        "fetched_ts": "2026-05-12T15:51:21.977915+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 27.589573,
+      "stale": false,
+      "last_close": 491.6,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 223990,
+      "prior_close": 497.05,
+      "pct_change_vs_prior_close": -1.0964691680917389
+    },
+    "JNJ": {
+      "quote": {
+        "bid": 214.69,
+        "ask": 225.91,
+        "last_price": 225.91,
+        "volume": 300,
+        "quote_ts": "2026-05-12T15:51:20.317843+00:00",
+        "fetched_ts": "2026-05-12T15:51:22.148211+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 1.831696,
+      "stale": false,
+      "last_close": 224.48,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 275183,
+      "prior_close": 225.57,
+      "pct_change_vs_prior_close": -0.4832202863856025
+    },
+    "UNH": {
+      "quote": {
+        "bid": 381.87,
+        "ask": 394.15,
+        "last_price": 394.15,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:17.011540+00:00",
+        "fetched_ts": "2026-05-12T15:51:22.313831+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 5.303601,
+      "stale": false,
+      "last_close": 367.04,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 253705,
+      "prior_close": 363.835,
+      "pct_change_vs_prior_close": 0.88089381175534
+    },
+    "PFE": {
+      "quote": {
+        "bid": 25.95,
+        "ask": 25.96,
+        "last_price": 25.96,
+        "volume": 12200,
+        "quote_ts": "2026-05-12T15:51:22.341940+00:00",
+        "fetched_ts": "2026-05-12T15:51:22.473373+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.13263,
+      "stale": false,
+      "last_close": 26.5,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1511924,
+      "prior_close": 26.44,
+      "pct_change_vs_prior_close": 0.22692889561270316
+    },
+    "WMT": {
+      "quote": {
+        "bid": 130.26,
+        "ask": 130.29,
+        "last_price": 130.29,
+        "volume": 300,
+        "quote_ts": "2026-05-12T15:51:22.344215+00:00",
+        "fetched_ts": "2026-05-12T15:51:22.633455+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.290343,
+      "stale": false,
+      "last_close": 130.09,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 492155,
+      "prior_close": 130.84,
+      "pct_change_vs_prior_close": -0.5732191990217059
+    },
+    "COST": {
+      "quote": {
+        "bid": 969.46,
+        "ask": 1022.0,
+        "last_price": 1022.0,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:13.625395+00:00",
+        "fetched_ts": "2026-05-12T15:51:22.832657+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 9.208547,
+      "stale": false,
+      "last_close": 995.59,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 53834,
+      "prior_close": 1016.59,
+      "pct_change_vs_prior_close": -2.0657295468182846
+    },
+    "HD": {
+      "quote": {
+        "bid": 311.75,
+        "ask": 312.57,
+        "last_price": 312.57,
+        "volume": 80,
+        "quote_ts": "2026-05-12T15:51:19.633194+00:00",
+        "fetched_ts": "2026-05-12T15:51:23.004052+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 3.37216,
+      "stale": false,
+      "last_close": 323.03,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 249605,
+      "prior_close": 315.34,
+      "pct_change_vs_prior_close": 2.4386376609374003
+    },
+    "XOM": {
+      "quote": {
+        "bid": 150.98,
+        "ask": 151.2,
+        "last_price": 151.2,
+        "volume": 300,
+        "quote_ts": "2026-05-12T15:51:23.154484+00:00",
+        "fetched_ts": "2026-05-12T15:51:23.205266+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.051999,
+      "stale": false,
+      "last_close": 148.62,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 734417,
+      "prior_close": 154.88,
+      "pct_change_vs_prior_close": -4.041838842975201
+    },
+    "ORCL": {
+      "quote": {
+        "bid": 183.0,
+        "ask": 195.0,
+        "last_price": 195.0,
+        "volume": 200,
+        "quote_ts": "2026-05-12T15:51:23.272344+00:00",
+        "fetched_ts": "2026-05-12T15:51:23.376974+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.105884,
+      "stale": false,
+      "last_close": 193.99,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 802570,
+      "prior_close": 185.48,
+      "pct_change_vs_prior_close": 4.588095751563522
+    },
+    "CSCO": {
+      "quote": {
+        "bid": 98.04,
+        "ask": 98.09,
+        "last_price": 98.09,
+        "volume": 400,
+        "quote_ts": "2026-05-12T15:51:23.510096+00:00",
+        "fetched_ts": "2026-05-12T15:51:23.562160+00:00",
+        "feed": "iex"
+      },
+      "staleness_seconds": 0.053492,
+      "stale": false,
+      "last_close": 91.63,
+      "last_bar_ts": "2026-05-06T04:00:00+00:00",
+      "last_volume": 1124256,
+      "prior_close": 94.3,
+      "pct_change_vs_prior_close": -2.8313891834570537
+    }
+  },
+  "notes": []
+}
