@@ -146,6 +146,20 @@ Built:
 - [x] `prompts/routines/market_open.md`, `midday.md`, `pre_close.md` — rewritten as monitoring-only with explicit "no new entries" guard, CB consultation, paper_sim integration, "commit only if action happened" semantics.
 - [x] `config/routine_schedule.yaml` — three routines flipped from `enabled: false phase: v2` to `enabled: true phase: v1`. Top-of-file comment updated.
 
+### Telegram message format — landed 2026-05-12
+
+Notifications were prose paragraphs; switched to a bulleted format with bold labels for easier mobile scan. Added a `*Context:* ~<N> KB (cap 200 KB)` line on every message so context drift is visible at a glance, not buried in audit logs.
+
+Required format:
+- Header: `*[Calm Turtle] <routine title> <YYYY-MM-DD>*`
+- One bulleted line per metric (regime, signals, PnL, CB state, etc.)
+- Mandatory `• *Context:* ~<N> KB` (populated from `approximate_input_kb` in the audit step)
+- Mandatory `• *Commit:* <SHA> (auto-merged to main)`
+- Artifact links: `/blob/main/<path>` form so they resolve after auto-merge
+- Never mention the feature branch name
+
+All 8 routine prompts updated with per-routine field lists + a concrete example. `lib/notify.py` already uses `parse_mode: "Markdown"` so `*bold*` renders correctly on iOS / Android / desktop clients.
+
 ### Context-budget protection — landed 2026-05-12
 
 Pre-emptive guard against journals/per-symbol-histories growing unbounded over months. Two mechanisms:

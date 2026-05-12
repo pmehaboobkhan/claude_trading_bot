@@ -140,38 +140,57 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
 ## Why no intraday routines yet?
 Daily-bar strategies (`dual_momentum_taa`, `large_cap_momentum_top5`, `gold_permanent_overlay`) only need a daily decision point. Adding midday / pre-close routines in v1 would mostly produce churn without alpha. They're scaffolded but `enabled: false` in `routine_schedule.yaml`. We'll enable them in v2 if backtests show intraday signals add value.
 
+
+
 ## Composing the Telegram notification
 
-The routine commits to a `claude/...` feature branch (Claude Code default).
-A GitHub Action immediately fast-forward-merges that branch into `main`
-and deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+This routine commits to a `claude/...` feature branch (Claude Code default).
+A GitHub Action immediately fast-forward-merges that branch into `main` and
+deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+By the time the user reads your Telegram message, the feature branch is gone.
 
-This means: **by the time the user reads your Telegram message, the feature
-branch no longer exists**. Never reference the feature branch by name in the
-notification.
+**Required format: bulleted, with bold labels.** Telegram renders Markdown
+(`*bold*`) and the `•` character is a literal bullet that all clients
+handle correctly. **Do NOT send prose paragraphs** — bullets are easier
+to skim on mobile.
 
-Compose links as follows:
+**Required fields, in order**, on each notification:
 
-- **Artifacts**: link to the file on the `main` branch using the form
-  `https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
-  These URLs resolve as soon as the auto-merge completes (~30 seconds after
-  your push) and remain stable forever.
-- **Commits**: cite the short SHA (e.g. `d10f9b6`). Do **not** suffix it
-  with "on claude/<branch>" — commit SHAs are independent of branch refs
-  and remain valid after the feature branch is deleted. If you want a
-  clickable link, use `https://github.com/pmehaboobkhan/claude_trading_bot/commit/<sha>`.
-- **Status**: it is fine to say "auto-merged to main" or to omit branch
-  information entirely. Do not mention the feature branch name.
+1. Header — `*[Calm Turtle] <routine title> <YYYY-MM-DD>*` on its own line.
+2. One bulleted line per metric (regime, signals, PnL, etc. — see per-routine list below).
+3. `• *Context:* ~<N> KB (cap 200 KB)` — populate N from the `approximate_input_kb`
+   you computed in the audit step (sum of `files_read[].bytes` divided by 1024).
+   This is a proxy for input-token cost, exposed so the user can spot context drift.
+4. `• *Commit:* <short SHA> (auto-merged to main)` — short SHA only; never
+   suffix with `on claude/<branch>`.
+5. Artifact links (one per line), each as
+   `*<Label>:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
+   Use `/blob/main/<path>` — these resolve once the auto-merge completes
+   (~30 seconds after push) and remain stable forever.
 
-Example for pre_market:
+**Rules:**
+- Never mention the feature branch name. Ever.
+- Notify only if action was taken or a risk event fired. Pure no-op runs
+  are logged to `logs/routine_runs/` but skip Telegram.
+- Keep each bullet under one line on a phone (~50–60 chars). Truncate
+  long thesis text and link to the full report instead.
+- Total message length under 1500 chars; Telegram caps at 4096.
+
+**Example for End of day:**
 
 ```
-[Calm Turtle] Pre-market 2026-05-12
-Regime: range_bound (low confidence)
-7 ENTRY signals; top candidate GLD (Strategy A + C agree)
-Commit: d10f9b6 (auto-merged to main)
-Report: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/pre_market/2026-05-12.md
-Journal: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/daily/2026-05-12.md
+*[Calm Turtle] EOD 2026-05-13*
+
+• *PnL:* +$184.20 (+0.18%)
+• *Trades:* 3 opens, 0 closes
+• *Open positions:* 4 (GOOGL, JNJ, GLD, WMT)
+• *Circuit-breaker:* FULL (DD 0.4%)
+• *Mode:* PAPER_TRADING
+• *Context:* ~32 KB (cap 200 KB)
+• *Commit:* a1b2c3d (auto-merged to main)
+
+*Journal:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/daily/2026-05-13.md
+*Snapshot:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/memory/daily_snapshots/2026-05-13.md
 ```
 
 ## Routine audit log (mandatory final step)

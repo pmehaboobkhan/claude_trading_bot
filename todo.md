@@ -84,6 +84,12 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 - [x] Routine prompts rewritten as monitoring-only: `prompts/routines/{market_open,midday,pre_close}.md`. Hard "no new entries" rule.
 - [x] `config/routine_schedule.yaml` — three routines flipped to `enabled: true phase: v1` with explanatory header comment.
 
+### Telegram bullet format + context line — landed 2026-05-12
+
+- [x] All 8 routine prompts: notification composition section rewritten with bulleted format, bold labels, mandatory `*Context:*` line populated from the audit's `approximate_input_kb`.
+- [x] Per-routine concrete examples (pre_market, end_of_day, market_open, midday, pre_close, self_learning_review, weekly_review, monthly_review).
+- [x] `lib/notify.py` already uses `parse_mode: "Markdown"` — no code change needed; bullets and bold render natively.
+
 ### Context-budget protection — landed 2026-05-12
 
 - [x] `lib/snapshots.py` — DailySnapshot dataclass, write/read helpers, YAML frontmatter + markdown body. end_of_day writes; pre_market reads.

@@ -28,38 +28,55 @@ In v2, this routine also drafts prompt updates and review docs per the full self
 ## Why
 LLMs are extremely prone to "explaining randomness as patterns." Below ~50 trades, any pattern we'd find is overwhelmingly likely to be noise. Self-Learning's value in v1 is *recording faithfully*, not *prescribing*.
 
+
+
 ## Composing the Telegram notification
 
-The routine commits to a `claude/...` feature branch (Claude Code default).
-A GitHub Action immediately fast-forward-merges that branch into `main`
-and deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+This routine commits to a `claude/...` feature branch (Claude Code default).
+A GitHub Action immediately fast-forward-merges that branch into `main` and
+deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+By the time the user reads your Telegram message, the feature branch is gone.
 
-This means: **by the time the user reads your Telegram message, the feature
-branch no longer exists**. Never reference the feature branch by name in the
-notification.
+**Required format: bulleted, with bold labels.** Telegram renders Markdown
+(`*bold*`) and the `•` character is a literal bullet that all clients
+handle correctly. **Do NOT send prose paragraphs** — bullets are easier
+to skim on mobile.
 
-Compose links as follows:
+**Required fields, in order**, on each notification:
 
-- **Artifacts**: link to the file on the `main` branch using the form
-  `https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
-  These URLs resolve as soon as the auto-merge completes (~30 seconds after
-  your push) and remain stable forever.
-- **Commits**: cite the short SHA (e.g. `d10f9b6`). Do **not** suffix it
-  with "on claude/<branch>" — commit SHAs are independent of branch refs
-  and remain valid after the feature branch is deleted. If you want a
-  clickable link, use `https://github.com/pmehaboobkhan/claude_trading_bot/commit/<sha>`.
-- **Status**: it is fine to say "auto-merged to main" or to omit branch
-  information entirely. Do not mention the feature branch name.
+1. Header — `*[Calm Turtle] <routine title> <YYYY-MM-DD>*` on its own line.
+2. One bulleted line per metric (regime, signals, PnL, etc. — see per-routine list below).
+3. `• *Context:* ~<N> KB (cap 200 KB)` — populate N from the `approximate_input_kb`
+   you computed in the audit step (sum of `files_read[].bytes` divided by 1024).
+   This is a proxy for input-token cost, exposed so the user can spot context drift.
+4. `• *Commit:* <short SHA> (auto-merged to main)` — short SHA only; never
+   suffix with `on claude/<branch>`.
+5. Artifact links (one per line), each as
+   `*<Label>:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
+   Use `/blob/main/<path>` — these resolve once the auto-merge completes
+   (~30 seconds after push) and remain stable forever.
 
-Example for pre_market:
+**Rules:**
+- Never mention the feature branch name. Ever.
+- Notify only if action was taken or a risk event fired. Pure no-op runs
+  are logged to `logs/routine_runs/` but skip Telegram.
+- Keep each bullet under one line on a phone (~50–60 chars). Truncate
+  long thesis text and link to the full report instead.
+- Total message length under 1500 chars; Telegram caps at 4096.
+
+**Example for Self-learning review:**
 
 ```
-[Calm Turtle] Pre-market 2026-05-12
-Regime: range_bound (low confidence)
-7 ENTRY signals; top candidate GLD (Strategy A + C agree)
-Commit: d10f9b6 (auto-merged to main)
-Report: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/pre_market/2026-05-12.md
-Journal: https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/daily/2026-05-12.md
+*[Calm Turtle] Self-learning review 2026-05-17*
+
+• *Period:* 2026-05-12 → 2026-05-16 (5 trading days)
+• *Observations written:* 4
+• *Top pattern:* large_cap_momentum_top5 entries on FOMC weeks underperform (N=2, low confidence)
+• *Proposals drafted:* 0 (v1 observations-only)
+• *Context:* ~24 KB (cap 200 KB)
+• *Commit:* l1m2n3o (auto-merged to main)
+
+*Report:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/reports/learning/weekly_learning_review_2026-05-17.md
 ```
 
 ## Routine audit log (mandatory final step)

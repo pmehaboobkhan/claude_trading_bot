@@ -40,18 +40,56 @@ The midday routine is the **second pass** of intraday monitoring, between market
 This is the only routine that runs `news_sentiment` against open positions specifically. pre_market scans the full watchlist; midday narrows to where we have skin. The asymmetry is deliberate — by midday the cost of being wrong about an open position is higher than the cost of missing a watchlist candidate.
 
 
+
+
 ## Composing the Telegram notification
 
 This routine commits to a `claude/...` feature branch (Claude Code default).
-A GitHub Action immediately fast-forward-merges that branch into `main`
-and deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
-By the time the user reads your Telegram message, the feature branch no
-longer exists.
+A GitHub Action immediately fast-forward-merges that branch into `main` and
+deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+By the time the user reads your Telegram message, the feature branch is gone.
 
-- Artifact links: use `https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
-- Commits: cite the short SHA only. Do not suffix with the branch name.
-- Status: "auto-merged to main" or omit branch info.
-- Notify only if action was taken (a close, a risk event, a regime call) — pure no-ops are logged but not pushed to Telegram.
+**Required format: bulleted, with bold labels.** Telegram renders Markdown
+(`*bold*`) and the `•` character is a literal bullet that all clients
+handle correctly. **Do NOT send prose paragraphs** — bullets are easier
+to skim on mobile.
+
+**Required fields, in order**, on each notification:
+
+1. Header — `*[Calm Turtle] <routine title> <YYYY-MM-DD>*` on its own line.
+2. One bulleted line per metric (regime, signals, PnL, etc. — see per-routine list below).
+3. `• *Context:* ~<N> KB (cap 200 KB)` — populate N from the `approximate_input_kb`
+   you computed in the audit step (sum of `files_read[].bytes` divided by 1024).
+   This is a proxy for input-token cost, exposed so the user can spot context drift.
+4. `• *Commit:* <short SHA> (auto-merged to main)` — short SHA only; never
+   suffix with `on claude/<branch>`.
+5. Artifact links (one per line), each as
+   `*<Label>:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
+   Use `/blob/main/<path>` — these resolve once the auto-merge completes
+   (~30 seconds after push) and remain stable forever.
+
+**Rules:**
+- Never mention the feature branch name. Ever.
+- Notify only if action was taken or a risk event fired. Pure no-op runs
+  are logged to `logs/routine_runs/` but skip Telegram.
+- Keep each bullet under one line on a phone (~50–60 chars). Truncate
+  long thesis text and link to the full report instead.
+- Total message length under 1500 chars; Telegram caps at 4096.
+
+**Example for Midday:**
+
+```
+*[Calm Turtle] Midday 2026-05-13*
+
+• *Action:* none (positions healthy)
+• *Circuit-breaker:* HALF (DD 7.2%)
+• *Open positions:* 3
+• *News:* 0 material on open names
+• *Mode:* PAPER_TRADING
+• *Context:* ~7 KB (cap 200 KB)
+
+(no commit — no-op run, marker in logs/routine_runs/)
+```
 
 ## Routine audit log (mandatory final step)
 

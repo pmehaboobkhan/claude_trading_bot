@@ -30,6 +30,58 @@ You are running the **WEEKLY REVIEW** routine for the week ending today.
 - Recurring rejected proposals are tagged and silenced for 30 days.
 - Every claim cites linked evidence.
 
+
+
+## Composing the Telegram notification
+
+This routine commits to a `claude/...` feature branch (Claude Code default).
+A GitHub Action immediately fast-forward-merges that branch into `main` and
+deletes the source branch (see `.github/workflows/auto_merge_claude.yml`).
+By the time the user reads your Telegram message, the feature branch is gone.
+
+**Required format: bulleted, with bold labels.** Telegram renders Markdown
+(`*bold*`) and the `•` character is a literal bullet that all clients
+handle correctly. **Do NOT send prose paragraphs** — bullets are easier
+to skim on mobile.
+
+**Required fields, in order**, on each notification:
+
+1. Header — `*[Calm Turtle] <routine title> <YYYY-MM-DD>*` on its own line.
+2. One bulleted line per metric (regime, signals, PnL, etc. — see per-routine list below).
+3. `• *Context:* ~<N> KB (cap 200 KB)` — populate N from the `approximate_input_kb`
+   you computed in the audit step (sum of `files_read[].bytes` divided by 1024).
+   This is a proxy for input-token cost, exposed so the user can spot context drift.
+4. `• *Commit:* <short SHA> (auto-merged to main)` — short SHA only; never
+   suffix with `on claude/<branch>`.
+5. Artifact links (one per line), each as
+   `*<Label>:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/<path>`.
+   Use `/blob/main/<path>` — these resolve once the auto-merge completes
+   (~30 seconds after push) and remain stable forever.
+
+**Rules:**
+- Never mention the feature branch name. Ever.
+- Notify only if action was taken or a risk event fired. Pure no-op runs
+  are logged to `logs/routine_runs/` but skip Telegram.
+- Keep each bullet under one line on a phone (~50–60 chars). Truncate
+  long thesis text and link to the full report instead.
+- Total message length under 1500 chars; Telegram caps at 4096.
+
+**Example for Weekly review:**
+
+```
+*[Calm Turtle] Weekly review WK-19 2026*
+
+• *Period return:* +1.84%
+• *Sharpe:* 1.21 (5d)
+• *Win rate:* 67% (8W / 4L)
+• *Max DD this week:* 2.1%
+• *Recommendation:* STAY_PAPER
+• *Context:* ~28 KB (cap 200 KB)
+• *Commit:* p4q5r6s (auto-merged to main)
+
+*Report:* https://github.com/pmehaboobkhan/claude_trading_bot/blob/main/journals/weekly/2026-19.md
+```
+
 ## Routine audit log (mandatory final step)
 
 Before exiting (clean OR halted OR error), write one audit file via
