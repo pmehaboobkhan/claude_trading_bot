@@ -1,0 +1,51 @@
+name: Auto-merge Claude routine branches to main
+
+# Claude Code routines push their commits to `claude/*` branches because the
+# platform's default workflow assumes PR review. For our scheduled trading
+# routines there is no human waiting to review — the file-level hooks in
+# `.claude/hooks/` already enforce every safety rule. This Action collapses
+# Claude's feature branches back into `main` automatically.
+#
+# Triggers on any push to a `claude/*` branch. Fast-forward-merges to main
+# and deletes the source branch. Fails loud (and leaves the branch alone)
+# if the merge would not be a clean fast-forward, so anything weird is
+# visible in the Actions tab instead of silently losing commits.
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  ff-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.email "claude-auto-merge@users.noreply.github.com"
+          git config user.name "Claude Auto-Merge"
+
+      - name: Fast-forward merge feature branch into main
+        env:
+          FEATURE_REF: ${{ github.ref_name }}
+        run: |
+          set -e
+          echo "Merging '${FEATURE_REF}' into main"
+          git fetch origin "${FEATURE_REF}":"${FEATURE_REF}"
+          git merge --ff-only "${FEATURE_REF}"
+          git push origin main
+
+      - name: Delete the source feature branch
+        env:
+          FEATURE_REF: ${{ github.ref_name }}
+        run: |
+          git push origin --delete "${FEATURE_REF}"
