@@ -133,6 +133,33 @@ def test_taa_falls_to_cash_when_no_risk_asset_qualifies() -> None:
         assert all(s.action != "ENTRY" for s in sym_sigs), f"{sym} should not enter in bear regime"
 
 
+def test_taa_explicit_params_210_days_matches_default() -> None:
+    """Passing params={'ma_window_days': 210} must produce identical signals to the default.
+
+    This pins the parameterization plumbing so that --sma-months 10 (→ 210 days)
+    cannot silently diverge from the default-call behaviour.
+    """
+    bars = {
+        "SPY": _trend_bars(280, start=400, daily_pct=0.0015),
+        "IEF": _trend_bars(280, start=100, daily_pct=0.0002),
+        "GLD": _trend_bars(280, start=180, daily_pct=0.0001),
+        "SHV": _trend_bars(280, start=110, daily_pct=0.00015),
+    }
+    regime = signals.RegimeReading("bullish_trend", "medium", {}, [])
+    kwargs = dict(
+        watchlist_symbols=list(bars.keys()),
+        regime=regime,
+        strategy_rules={},
+    )
+    default_sigs = signals.evaluate_dual_momentum_taa(bars, **kwargs)
+    explicit_sigs = signals.evaluate_dual_momentum_taa(bars, params={"ma_window_days": 210}, **kwargs)
+    default_facts = [(s.symbol, s.action) for s in default_sigs]
+    explicit_facts = [(s.symbol, s.action) for s in explicit_sigs]
+    assert explicit_facts == default_facts, (
+        "params={'ma_window_days': 210} must match default-call output"
+    )
+
+
 def test_taa_returns_empty_when_required_symbols_missing() -> None:
     """If SHV is missing, can't compute cash floor — return no signals."""
     bars = {"SPY": _trend_bars(280), "IEF": _trend_bars(280), "GLD": _trend_bars(280)}

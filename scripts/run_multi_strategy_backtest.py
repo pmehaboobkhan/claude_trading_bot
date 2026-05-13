@@ -410,6 +410,7 @@ def run_backtest(args) -> dict:
     # --- Strategy A: dual_momentum_taa ---
     cap_a = deployed_capital * ALLOCATION["dual_momentum_taa"]
     print(f"\n[strategy A] dual_momentum_taa ${cap_a:,.0f}...")
+    sma_months = getattr(args, "sma_months", 10)
     t0 = time.time()
     result_a = backtest.run_backtest(
         strategy="dual_momentum_taa",
@@ -420,6 +421,7 @@ def run_backtest(args) -> dict:
         end_date=end_date,
         initial_capital=cap_a,
         max_position_size_pct=100.0,  # TAA holds 1 asset at a time
+        strategy_params={"dual_momentum_taa": {"ma_window_days": sma_months * 21}},
     )
     print(f"  done in {time.time() - t0:.1f}s; "
           f"return {result_a.total_return_pct:+.2f}%, trades {len(result_a.trades)}")
@@ -748,6 +750,9 @@ def main() -> int:
                         help="Drawdown below which OUT → HALF (default 0.08 = 8%%). "
                              "Asymmetric vs cb-recovery-dd: tight hysteresis around HALF, "
                              "fast recovery from OUT.")
+    parser.add_argument("--sma-months", type=int, default=10,
+                        help="Strategy A trend-filter SMA window in months (default 10). "
+                             "21 trading days per month; 10 → 210-day SMA (Faber TAA default).")
     parser.add_argument("--label", default="",
                         help="Optional tag included in the report filename")
     parser.add_argument("--no-report", dest="write_report", action="store_false",

@@ -21,6 +21,7 @@ def _default_args(**overrides):
         circuit_breaker=True,
         cb_half_dd=0.08, cb_out_dd=0.12,
         cb_recovery_dd=0.05, cb_out_recover_dd=0.08,
+        sma_months=10,
         label="test",
         write_report=False,
     )
