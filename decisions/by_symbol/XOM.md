@@ -27,3 +27,12 @@
 - Mark (2026-05-07 bar close): $146.51. Unrealized PnL: -$85.59 (-1.44%). **Lone unrealized loser today.**
 - Stop ($133.758) is $12.75/share below mark; ample headroom. No exit triggered.
 - cb_state=FULL, throttle=1.0.
+
+## 2026-05-13 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-13, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 2/21 +29.76% 6m, SPY trend up).
+- Quote at close $142.12 (Alpaca IEX live, 20:00:05Z; pre_close 19:36Z saw $151.33 — significant late-day reversal driven by oil-complex weakness).
+- Mark vs entry $148.6497 → -$261.19 (-4.39%). Stop $133.758 (5.9% headroom).
+- Decision: continue holding; no new decision file written.
+- Watch: XOM gave back all of today's earlier gains in the final 25 minutes. Headroom to stop is now the tightest in the book.

@@ -31,3 +31,11 @@
 - Position held; no fill, no close.
 - Mark (2026-05-07 bar close): $431.67. Unrealized PnL: +$30.05 (+0.21%).
 - cb_state=FULL, throttle=1.0; equity peak $99,992.31 unchanged.
+
+## 2026-05-13 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-13, mode PAPER_TRADING, cb_state=OUT (no transition this run), throttle=0.0.
+- Signal: ENTRY re-confirmed for both strategies (dual_momentum_taa top-1; gold_permanent_overlay permanent policy).
+- Quote at close $430.55. Mark vs entry $430.7861 → -$8.03 (-0.05%). Stop $387.63 (10.0% headroom).
+- Decision: continue holding; no new decision file written (held-position re-confirm; no fill, no close).
+- Cumulative: still 1 open position, qty 34 @ $430.7861. Day-1 friction artifact carries forward.

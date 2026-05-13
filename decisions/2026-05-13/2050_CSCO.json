@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-13T20:50:00Z",
+  "routine_id": "end_of_day_2026-05-13",
+  "symbol": "CSCO",
+  "decision": "NO_TRADE",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Deterministic signal evaluator at EOD reproduces CSCO as ENTRY (rank 3/21, 6m return +25.97%, SPY trend filter passed). pre_close routine at 19:36Z closed the existing CSCO position (+$618.90 realized) for asymmetric overnight earnings risk; if the Q3 FY26 print clears without a major gap-down, the momentum signal would normally drive a re-entry on the next close.",
+  "thesis_bear": "Three reasons the re-entry is wrong at this EOD: (a) circuit-breaker state OUT throttles new opens to qty=0; (b) the earnings catalyst that justified today's close is still hours away (AMC, conference call 4:30 PM ET) — re-opening before the print is exactly the asymmetric exposure pre_close existed to refuse; (c) daily-bar data staleness 19 days breaches max_data_staleness_seconds=60. The pre_close commentary explicitly anticipated re-entry on 2026-05-14 EOD after the print resolves, not on the same-day EOD.",
+  "invalidation_condition": "All three gates clear: CB returns to FULL/HALF (throttle > 0), the CSCO earnings event has resolved (post-print on 2026-05-14), and daily-bar data freshness is within max_data_staleness_seconds. Until then, no re-entry. If CSCO gaps down >10% on the print and falls out of the top-7 buffer on the 2026-05-14 EOD signal, the strategy may permanently EXIT this name rather than re-enter.",
+  "risk_reward": {
+    "entry": 96.36,
+    "stop": 86.724,
+    "target": 120.45,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 0,
+    "usd": 0,
+    "pct_of_account": 0,
+    "circuit_breaker_state": "OUT",
+    "throttle_applied": 0.0,
+    "intended_shares_pre_throttle": 62,
+    "intended_usd_pre_throttle": 5974.32,
+    "intended_pct_pre_throttle": 5.97,
+    "sizing_basis": "Strategy B target 6% ≈ $5,974 at quote $96.36 → 62 shares; throttled to 0 by CB OUT and overruled by earnings-window policy anyway."
+  },
+  "confidence_score": 0.4,
+  "confidence_notes": "Lower than AMZN (0.55) because re-opening into an unresolved earnings event tonight would be procedurally inconsistent with the close we just executed at pre_close. Even if CB were FULL, the earnings-window prohibition implied by `holding_earnings_caution_window_days = 1` in strategy_rules and by pre_close.md's overnight-risk overlay would push this to NO_TRADE.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "NO_TRADE reduces no risk; APPROVED. Were this a PAPER_BUY: REJECTED on three grounds — (1) CB OUT throttle=0.0; (2) data staleness 19 days >> 60s cap; (3) holding_earnings_caution_window_days=1 against tonight's Q3 FY26 print. Each is individually disqualifying.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "CSCO on watchlist with approved_for_paper_trading=true; large_cap_momentum_top5 active; mode permits the decision class. NO_TRADE is recorded so the audit trail shows the system saw the signal and refused on policy. Schema-compliant.",
+  "human_approval_required": false,
+  "final_status": "NO_TRADE",
+  "rejection_reason": "circuit_breaker_OUT AND earnings_window_open AND data_staleness_breach",
+  "data_provenance": {
+    "signals_source": "data/market/2026-05-13/1630.json (signals.evaluate_all at EOD)",
+    "quote_source": "lib.data.get_latest_quote (Alpaca IEX live, 20:00:03Z 2026-05-13)",
+    "quote_at_close": 96.36,
+    "daily_bar_latest_ts": "2026-04-24T04:00:00+00:00",
+    "daily_bar_staleness_days": 19,
+    "max_data_staleness_seconds": 60,
+    "regime": "bullish_trend (medium confidence; partly feed-artifact)",
+    "circuit_breaker_state": "OUT",
+    "circuit_breaker_peak_equity": 119140.25,
+    "circuit_breaker_current_equity": 99892.95,
+    "circuit_breaker_dd_pct": 16.16,
+    "throttle": 0.0,
+    "earnings_catalyst": "CSCO Q3 FY26 AMC 2026-05-13; pre_close decision file decisions/2026-05-13/1536_CSCO.json closed the prior position",
+    "related_decisions": ["decisions/2026-05-13/1536_CSCO.json"]
+  }
+}

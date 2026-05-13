@@ -26,3 +26,12 @@
 - Position held; no fill, no close.
 - Mark (2026-05-07 bar close): $130.24. Unrealized PnL: +$5.70 (+0.10%).
 - cb_state=FULL, throttle=1.0.
+
+## 2026-05-13 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-13, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 4/21 +21.29% 6m, SPY trend up).
+- Quote at close $125.30 (Alpaca IEX live, 20:00:02Z; pre_close 19:36Z saw $131.34 — sharp late-day reversal).
+- Mark vs entry $130.116 → -$221.54 (-3.70%). Stop $117.081 (6.6% headroom).
+- Decision: continue holding; no new decision file written.
+- Forward risk: April retail sales releases 2026-05-14 BMO; WMT is itself a component of the data series. Pre-market 2026-05-14 must flag the print and any WMT reaction. WMT's own earnings 2026-05-21 BMO (one week out).

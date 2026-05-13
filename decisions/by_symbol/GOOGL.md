@@ -26,3 +26,12 @@
 - Position held; no fill, no close.
 - Mark (2026-05-07 bar close): $397.89. Unrealized PnL: -$0.29 (-0.01%).
 - cb_state=FULL, throttle=1.0.
+
+## 2026-05-13 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-13, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 1/21 +36.81% 6m, SPY trend up).
+- Quote at close $382.23 (Alpaca IEX live, 20:00:02Z; pre_close 19:36Z saw $402.96 — late-day give-back).
+- Mark vs entry $397.9096 → -$235.19 (-3.94%). Stop $358.047 (6.3% headroom).
+- Decision: continue holding; no new decision file written. Position is now this session's largest single-name unrealized loss.
+- Watch tomorrow: monitor for further give-back. Stop is 6% below close so still ample headroom but tighter than yesterday.
