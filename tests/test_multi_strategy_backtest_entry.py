@@ -29,15 +29,25 @@ def _default_args(**overrides):
 
 
 def test_run_backtest_returns_metrics_dict():
-    """Sanity: callable form returns the expected metric keys."""
+    """Sanity: callable form returns all 12 documented metric keys with expected types."""
     result = mod.run_backtest(_default_args())
     assert isinstance(result, dict)
     for key in ("ann_return", "max_drawdown_pct", "sharpe", "final_equity",
-                "cb_events", "n_trades"):
+                "cb_events", "n_trades", "equity_curve",
+                "overall", "hit_low", "hit_high", "dd_ok", "sharpe_ok"):
         assert key in result, f"missing key: {key}"
     # Sanity ranges (loose; just verifying we got real numbers)
     assert -100 < result["ann_return"] < 200
     assert 0 <= result["max_drawdown_pct"] <= 100
+    # Type checks for structured/boolean keys
+    assert isinstance(result["cb_events"], list)
+    assert isinstance(result["n_trades"], int)
+    assert isinstance(result["equity_curve"], list)
+    assert isinstance(result["overall"], bool)
+    assert isinstance(result["hit_low"], bool)
+    assert isinstance(result["hit_high"], bool)
+    assert isinstance(result["dd_ok"], bool)
+    assert isinstance(result["sharpe_ok"], bool)
 
 
 def test_run_backtest_no_report_when_write_report_false():
@@ -47,3 +57,19 @@ def test_run_backtest_no_report_when_write_report_false():
     mod.run_backtest(args)
     after = set((REPO_ROOT / "backtests" / "multi_strategy_portfolio").glob("*no_write_smoke*"))
     assert before == after, "run_backtest wrote a report despite write_report=False"
+
+
+def test_run_backtest_raises_on_bad_allocations():
+    """Allocations that don't sum to 1.0 must raise ValueError (not silently exit 1)."""
+    import pytest
+    args = _default_args(alloc_a=0.5, alloc_b=0.5, alloc_c=0.5)  # sums to 1.5
+    with pytest.raises(ValueError, match=r"alloc"):
+        mod.run_backtest(args)
+
+
+def test_run_backtest_raises_on_bad_cash_buffer():
+    """cash_buffer_pct outside [0, 0.95) must raise ValueError."""
+    import pytest
+    args = _default_args(cash_buffer_pct=1.5)  # invalid
+    with pytest.raises(ValueError, match=r"cash"):
+        mod.run_backtest(args)

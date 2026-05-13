@@ -323,7 +323,6 @@ def run_backtest(args) -> dict:
     write_report = getattr(args, "write_report", True)
 
     if not 0.0 <= args.cash_buffer_pct < 0.95:
-        print(f"FATAL: --cash-buffer-pct must be in [0, 0.95), got {args.cash_buffer_pct}")
         raise ValueError(f"cash_buffer_pct out of range: {args.cash_buffer_pct}")
 
     ALLOCATION = {
@@ -333,9 +332,10 @@ def run_backtest(args) -> dict:
     }
     total_alloc = sum(ALLOCATION.values())
     if abs(total_alloc - 1.0) > 0.001:
-        print(f"FATAL: strategy allocations sum to {total_alloc:.3f}, must equal 1.0 "
-              f"(they're shares of the deployed portion; cash buffer is separate)")
-        raise ValueError(f"allocations sum to {total_alloc:.3f}, must equal 1.0")
+        raise ValueError(
+            f"allocations sum to {total_alloc:.3f}, must equal 1.0 "
+            f"(they're shares of the deployed portion; cash buffer is separate)"
+        )
 
     deployed_frac = 1.0 - args.cash_buffer_pct
     cash_capital = args.capital * args.cash_buffer_pct
@@ -377,7 +377,6 @@ def run_backtest(args) -> dict:
     # Align all symbols to the window.
     aligned = align_bars(bars, start_date=args.start, end_date=args.end)
     if "SPY" not in aligned:
-        print("FATAL: no SPY in aligned data")
         raise RuntimeError("no SPY in aligned data")
     sample_len = len(next(iter(aligned.values())))
     sample_first = next(iter(aligned.values()))[0]["ts"][:10]
@@ -404,7 +403,6 @@ def run_backtest(args) -> dict:
     # Determine backtest window (need 252 days of warmup for 12-month momentum).
     warmup = 252
     if sample_len <= warmup:
-        print(f"FATAL: only {sample_len} days, need > {warmup} for warmup")
         raise RuntimeError(f"only {sample_len} days, need > {warmup} for warmup")
     start_date = next(iter(aligned.values()))[warmup]["ts"][:10]
     end_date = sample_last
@@ -475,7 +473,6 @@ def run_backtest(args) -> dict:
         curves_to_combine.append(result_cash["equity_curve"])
     portfolio_curve = _combine_equity_curves(curves_to_combine)
     if not portfolio_curve:
-        print("FATAL: empty portfolio curve")
         raise RuntimeError("empty portfolio curve")
 
     # --- Optional circuit-breaker pass ---
