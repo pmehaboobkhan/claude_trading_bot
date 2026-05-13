@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -53,6 +53,7 @@ def make_args(start, end, h, o, htf, oth):
         circuit_breaker=True,
         cb_half_dd=h, cb_out_dd=o,
         cb_recovery_dd=htf, cb_out_recover_dd=oth,
+        sma_months=10,
         label="stability_sweep",
         write_report=False,
     )
@@ -91,12 +92,12 @@ def main() -> int:
     PROD = (0.08, 0.12, 0.05, 0.08)
 
     out_path = REPO_ROOT / "reports" / "learning" / (
-        f"cb_threshold_stability_{datetime.utcnow():%Y-%m-%d}.md"
+        f"cb_threshold_stability_{datetime.now(UTC):%Y-%m-%d}.md"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines = [
-        f"# Circuit-Breaker Threshold Stability Sweep — {datetime.utcnow():%Y-%m-%d}",
+        f"# Circuit-Breaker Threshold Stability Sweep — {datetime.now(UTC):%Y-%m-%d}",
         "",
         f"Window: {args.start} -> {args.end}",
         f"Strategies: 60/30/10 (TAA / large-cap / gold), IEF as Strategy A bond.",
@@ -119,12 +120,25 @@ def main() -> int:
     # Plateau check around the production choice
     prod_row = next((r for r in rows if (r["half_dd"], r["out_dd"], r["h_to_f"], r["o_to_h"]) == PROD), None)
     if prod_row is not None:
-        neighbors = [r for r in rows
-                     if abs(r["half_dd"] - PROD[0]) <= 0.01 + 1e-9
-                     and abs(r["out_dd"] - PROD[1]) <= 0.01 + 1e-9
-                     and abs(r["h_to_f"] - PROD[2]) <= 0.01 + 1e-9
-                     and abs(r["o_to_h"] - PROD[3]) <= 0.01 + 1e-9
-                     and (r["half_dd"], r["out_dd"], r["h_to_f"], r["o_to_h"]) != PROD]
+        # Strict neighbors: differ from PROD on EXACTLY ONE axis by EXACTLY ONE grid step.
+        # (With a 3-value grid spaced 0.01 apart, that's 8 neighbors max: 2 per axis.)
+        def _diffs(r):
+            return (
+                round(r["half_dd"] - PROD[0], 4),
+                round(r["out_dd"] - PROD[1], 4),
+                round(r["h_to_f"] - PROD[2], 4),
+                round(r["o_to_h"] - PROD[3], 4),
+            )
+
+        neighbors = []
+        for r in rows:
+            if (r["half_dd"], r["out_dd"], r["h_to_f"], r["o_to_h"]) == PROD:
+                continue
+            diffs = _diffs(r)
+            nonzero = [d for d in diffs if d != 0.0]
+            if len(nonzero) == 1 and abs(nonzero[0]) <= 0.01 + 1e-9:
+                neighbors.append(r)
+
         if neighbors:
             cagr_min = min(r["cagr"] for r in neighbors)
             cagr_max = max(r["cagr"] for r in neighbors)
@@ -135,12 +149,13 @@ def main() -> int:
             plateau = cagr_band <= 1.5 and mdd_band <= 2.0
             lines += [
                 "",
-                "## Plateau check (+/-1pp around production choice)",
+                "## Plateau check (strict neighbors: 1 threshold differs by 1 grid step)",
                 "",
                 f"- Production CAGR: {prod_row['cagr']:+.2f}% / MaxDD: {prod_row['mdd']:.2f}% / Sharpe: {prod_row['sharpe']:.2f}",
+                f"- Strict neighbors: {len(neighbors)} combos (of {len(rows) - 1} non-PROD)",
                 f"- Neighbor CAGR range: {cagr_min:+.2f}% to {cagr_max:+.2f}% (band {cagr_band:.2f}pp)",
                 f"- Neighbor MaxDD range: {mdd_min:.2f}% to {mdd_max:.2f}% (band {mdd_band:.2f}pp)",
-                f"- **Plateau verdict:** {'PASS — within +/-1.5pp CAGR and +/-2pp MaxDD bands' if plateau else 'FAIL — production choice may be overfit; review thresholds'}",
+                f"- **Plateau verdict:** {'PASS — within ±1.5pp CAGR and ±2pp MaxDD bands' if plateau else 'FAIL — production choice may be overfit; review thresholds'}",
             ]
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -91,9 +91,10 @@ Production choice: half_dd=0.08, out_dd=0.12, h->f=0.05, o->h=0.08 (marked **PRO
 | 0.09 | 0.11 | 0.06 | 0.07 | +8.12 | 13.87 | 0.92 | 17 | |
 | 0.07 | 0.13 | 0.06 | 0.07 | +7.91 | 14.70 | 0.90 | 26 | |
 
-## Plateau check (+/-1pp around production choice)
+## Plateau check (strict neighbors: 1 threshold differs by 1 grid step)
 
 - Production CAGR: +10.08% / MaxDD: 12.56% / Sharpe: 1.08
-- Neighbor CAGR range: +7.91% to +11.93% (band 4.01pp)
-- Neighbor MaxDD range: 11.62% to 14.70% (band 3.08pp)
+- Strict neighbors: 8 combos (of 80 non-PROD)
+- Neighbor CAGR range: +8.76% to +10.43% (band 1.67pp)
+- Neighbor MaxDD range: 12.39% to 13.87% (band 1.48pp)
 - **Plateau verdict:** FAIL — production choice may be overfit; review thresholds
