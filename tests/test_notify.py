@@ -245,5 +245,130 @@ def test_send_documents_returns_partial_count_when_some_fail(
     assert delivered == 1
 
 
+# ---------- HTML escape + format helpers ----------
+
+def test_escape_html_escapes_three_special_chars():
+    """Telegram HTML mode requires escaping &, <, > — and only those."""
+    from lib.notify import escape_html
+    assert escape_html("a & b < c > d") == "a &amp; b &lt; c &gt; d"
+    # Order matters — & must be escaped first, otherwise &lt; becomes &amp;lt;
+    assert escape_html("&lt;") == "&amp;lt;"
+    # Underscores, asterisks, brackets all pass through (no Markdown ambiguity)
+    assert escape_html("PAPER_TRADING [test]") == "PAPER_TRADING [test]"
+
+
+def test_format_helpers_produce_html_tags():
+    from lib.notify import bold, code, link
+    assert bold("Calm Turtle") == "<b>Calm Turtle</b>"
+    assert code("PAPER_TRADING") == "<code>PAPER_TRADING</code>"
+    assert link("report", "https://example.com/r") == '<a href="https://example.com/r">report</a>'
+
+
+def test_format_helpers_escape_user_text():
+    """Any free text inside helpers must be HTML-escaped to prevent broken markup."""
+    from lib.notify import bold, code, link
+    assert bold("a & b") == "<b>a &amp; b</b>"
+    assert code("if x < y") == "<code>if x &lt; y</code>"
+    # Link href is a URL — typically already URL-escaped, but also HTML-attr-escaped
+    assert link("a > b", "https://x.test/?q=1&p=2") == '<a href="https://x.test/?q=1&amp;p=2">a &gt; b</a>'
+
+
+# ---------- send_html() ----------
+
+def test_send_html_uses_html_parse_mode(monkeypatch):
+    """send_html must send parse_mode=HTML, not Markdown."""
+    from lib import notify
+    captured = {}
+    def fake_post(url, json=None, timeout=None):
+        captured["url"] = url
+        captured["json"] = json
+        class R:
+            def raise_for_status(self): pass
+        return R()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    ok = notify.send_html("<b>hi</b>")
+    assert ok is True
+    assert captured["json"]["parse_mode"] == "HTML"
+    assert "<b>hi</b>" in captured["json"]["text"]
+
+
+def test_send_html_no_credentials_returns_false(monkeypatch):
+    from lib import notify
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    assert notify.send_html("hi") is False
+
+
+def test_send_html_failure_returns_false(monkeypatch):
+    from lib import notify
+    import requests as req
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    def fake_post(*a, **kw):
+        raise req.RequestException("network down")
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    assert notify.send_html("<b>hi</b>") is False
+
+
+def test_legacy_send_unchanged(monkeypatch):
+    """The old send() must still use parse_mode=Markdown (no behavior change yet)."""
+    from lib import notify
+    captured = {}
+    def fake_post(url, json=None, timeout=None):
+        captured["json"] = json
+        class R:
+            def raise_for_status(self): pass
+        return R()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    notify.send("*bold*")
+    assert captured["json"]["parse_mode"] == "Markdown"
+
+
+# ---------- send_document_html() ----------
+
+def test_send_document_html_uses_html_parse_mode_for_caption(monkeypatch, tmp_path):
+    """send_document_html with caption must use parse_mode=HTML."""
+    from lib import notify
+    f = tmp_path / "test.md"
+    f.write_text("hello")
+    captured = {}
+    def fake_post(url, data=None, files=None, timeout=None):
+        captured["data"] = data
+        class R:
+            def raise_for_status(self): pass
+        return R()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    ok = notify.send_document_html(f, caption="<b>cap</b>")
+    assert ok is True
+    assert captured["data"]["parse_mode"] == "HTML"
+    assert captured["data"]["caption"] == "<b>cap</b>"
+
+
+def test_send_documents_html_returns_count(monkeypatch, tmp_path):
+    """send_documents_html should mirror send_documents — first gets caption."""
+    from lib import notify
+    f1 = tmp_path / "a.md"; f1.write_text("a")
+    f2 = tmp_path / "b.md"; f2.write_text("b")
+    captures = []
+    def fake_post(url, data=None, files=None, timeout=None):
+        captures.append({"caption": data.get("caption") if data else None})
+        class R:
+            def raise_for_status(self): pass
+        return R()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    n = notify.send_documents_html([f1, f2], caption="<b>first</b>")
+    assert n == 2
+    assert captures[0]["caption"] == "<b>first</b>"
+    assert "caption" not in captures[1] or captures[1]["caption"] is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
