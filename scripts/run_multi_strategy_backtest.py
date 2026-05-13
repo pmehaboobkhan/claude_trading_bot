@@ -292,48 +292,39 @@ def _combine_equity_curves(curves: list[list[tuple[str, float]]]) -> list[tuple[
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Core backtest logic (callable by sweep scripts)
 # ---------------------------------------------------------------------------
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--start", default="2005-01-01")
-    parser.add_argument("--end", default="2026-05-08")
-    parser.add_argument("--capital", type=float, default=100_000.0)
-    parser.add_argument("--alloc-a", type=float, default=DEFAULT_ALLOCATION["dual_momentum_taa"],
-                        help="Allocation for dual_momentum_taa (0-1)")
-    parser.add_argument("--alloc-b", type=float, default=DEFAULT_ALLOCATION["large_cap_momentum_top5"],
-                        help="Allocation for large_cap_momentum_top5 (0-1)")
-    parser.add_argument("--alloc-c", type=float, default=DEFAULT_ALLOCATION["gold_permanent_overlay"],
-                        help="Allocation for gold_permanent_overlay (0-1)")
-    parser.add_argument("--cash-buffer-pct", type=float, default=0.0,
-                        help="Fraction of total capital held in SHV as a cash buffer (0-0.95). "
-                             "alloc-a/b/c are interpreted as shares of the deployed portion "
-                             "and must still sum to 1.0; their effective share of total capital "
-                             "is alloc_i * (1 - cash_buffer_pct).")
-    parser.add_argument("--circuit-breaker", action="store_true",
-                        help="Apply portfolio-level drawdown circuit-breaker. Throttle state "
-                             "machine: FULL (100%% strategies) → HALF (50%%) at --cb-half-dd → "
-                             "OUT (0%%) at --cb-out-dd. Recover to FULL when DD ≤ --cb-recovery-dd. "
-                             "When throttled, the remainder sits in SHV.")
-    parser.add_argument("--cb-half-dd", type=float, default=0.08,
-                        help="Drawdown that trips FULL → HALF (default 0.08 = 8%%).")
-    parser.add_argument("--cb-out-dd", type=float, default=0.12,
-                        help="Drawdown that trips HALF → OUT (default 0.12 = 12%%).")
-    parser.add_argument("--cb-recovery-dd", type=float, default=0.05,
-                        help="Drawdown below which HALF → FULL (default 0.05 = 5%%). "
-                             "Provides hysteresis vs the 8%% HALF trigger.")
-    parser.add_argument("--cb-out-recover-dd", type=float, default=0.08,
-                        help="Drawdown below which OUT → HALF (default 0.08 = 8%%). "
-                             "Asymmetric vs cb-recovery-dd: tight hysteresis around HALF, "
-                             "fast recovery from OUT.")
-    parser.add_argument("--label", default="",
-                        help="Optional tag included in the report filename")
-    args = parser.parse_args()
+def run_backtest(args) -> dict:
+    """Run the full multi-strategy backtest and return a metrics dict.
+
+    Args:
+        args: Any object with the same attributes as the argparse Namespace produced
+              by main(). Accepted attributes:
+                start, end, capital, alloc_a, alloc_b, alloc_c,
+                cash_buffer_pct, circuit_breaker,
+                cb_half_dd, cb_out_dd, cb_recovery_dd, cb_out_recover_dd,
+                label, write_report (optional, defaults True).
+
+    Returns a dict with keys:
+        ann_return        – annualized return (%)
+        max_drawdown_pct  – max drawdown (%)
+        sharpe            – Sharpe ratio
+        final_equity      – final portfolio equity ($)
+        cb_events         – list of circuit-breaker event dicts (may be empty)
+        n_trades          – total closed trades across all strategies
+        equity_curve      – list of (date, portfolio_value) tuples
+        overall           – bool: meets minimum targets (ann_return≥8%, dd≤15%, sharpe≥0.8)
+        hit_low           – bool: ann_return ≥ TARGET_ANNUAL_RETURN_LOW
+        hit_high          – bool: ann_return ≥ TARGET_ANNUAL_RETURN_HIGH
+        dd_ok             – bool: max_drawdown_pct ≤ MAX_DRAWDOWN_CAP
+        sharpe_ok         – bool: sharpe ≥ MIN_SHARPE
+    """
+    write_report = getattr(args, "write_report", True)
 
     if not 0.0 <= args.cash_buffer_pct < 0.95:
         print(f"FATAL: --cash-buffer-pct must be in [0, 0.95), got {args.cash_buffer_pct}")
-        return 1
+        raise ValueError(f"cash_buffer_pct out of range: {args.cash_buffer_pct}")
 
     ALLOCATION = {
         "dual_momentum_taa": args.alloc_a,
@@ -344,7 +335,7 @@ def main() -> int:
     if abs(total_alloc - 1.0) > 0.001:
         print(f"FATAL: strategy allocations sum to {total_alloc:.3f}, must equal 1.0 "
               f"(they're shares of the deployed portion; cash buffer is separate)")
-        return 1
+        raise ValueError(f"allocations sum to {total_alloc:.3f}, must equal 1.0")
 
     deployed_frac = 1.0 - args.cash_buffer_pct
     cash_capital = args.capital * args.cash_buffer_pct
@@ -387,7 +378,7 @@ def main() -> int:
     aligned = align_bars(bars, start_date=args.start, end_date=args.end)
     if "SPY" not in aligned:
         print("FATAL: no SPY in aligned data")
-        return 1
+        raise RuntimeError("no SPY in aligned data")
     sample_len = len(next(iter(aligned.values())))
     sample_first = next(iter(aligned.values()))[0]["ts"][:10]
     sample_last = next(iter(aligned.values()))[-1]["ts"][:10]
@@ -414,7 +405,7 @@ def main() -> int:
     warmup = 252
     if sample_len <= warmup:
         print(f"FATAL: only {sample_len} days, need > {warmup} for warmup")
-        return 1
+        raise RuntimeError(f"only {sample_len} days, need > {warmup} for warmup")
     start_date = next(iter(aligned.values()))[warmup]["ts"][:10]
     end_date = sample_last
 
@@ -485,7 +476,7 @@ def main() -> int:
     portfolio_curve = _combine_equity_curves(curves_to_combine)
     if not portfolio_curve:
         print("FATAL: empty portfolio curve")
-        return 1
+        raise RuntimeError("empty portfolio curve")
 
     # --- Optional circuit-breaker pass ---
     cb_events: list[dict] = []
@@ -602,106 +593,172 @@ def main() -> int:
     print(f"  Live-trading unlock: requires the same targets met in paper trading for "
           f"90+ days AND 30+ closed trades, plus a signed PR to docs/risk_profile.md.")
 
-    # --- Write report ---
-    report_dir = REPO_ROOT / "backtests" / "multi_strategy_portfolio"
-    report_dir.mkdir(parents=True, exist_ok=True)
-    suffix = f"_{args.label}" if args.label else ""
-    report_file = report_dir / f"{start_date}_to_{end_date}{suffix}.md"
-    lines = [
-        f"# Multi-strategy backtest — {start_date} → {end_date}",
-        "",
-        "## Portfolio result",
-        f"- Initial capital: ${args.capital:,.2f}",
-        f"- Final equity: ${final_equity:,.2f}",
-        f"- Total return: {total_return:+.2f}%",
-        f"- **Annualized return: {ann_return:+.2f}%**",
-        f"- **Max drawdown: {mdd:.2f}%**",
-        f"- **Sharpe (rough): {sharpe:.2f}**",
-        f"- Years: {years:.2f}",
-        "",
-        "## Allocations and per-strategy contribution",
-        f"- Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, static — no rebalancing)",
-        f"- Deployed: ${deployed_capital:,.0f}",
-        "",
-        "| Strategy | Allocation (of total) | Return | Final equity | Trades |",
-        "|---|---:|---:|---:|---:|",
-        f"| dual_momentum_taa | {ALLOCATION['dual_momentum_taa'] * deployed_frac:.1%} | "
-        f"{result_a.total_return_pct:+.2f}% | ${result_a.final_equity:,.2f} | "
-        f"{sum(1 for t in result_a.trades if t['side'] == 'EXIT')} |",
-        f"| large_cap_momentum_top5 | {ALLOCATION['large_cap_momentum_top5'] * deployed_frac:.1%} | "
-        f"{result_b.total_return_pct:+.2f}% | ${result_b.final_equity:,.2f} | "
-        f"{sum(1 for t in result_b.trades if t['side'] == 'EXIT')} |",
-        f"| gold_permanent_overlay | {ALLOCATION['gold_permanent_overlay'] * deployed_frac:.1%} | "
-        f"{return_c:+.2f}% | ${final_c:,.2f} | "
-        f"{sum(1 for t in result_c['trades'] if t['side'] == 'EXIT')} |",
-        *(
-            [f"| cash_buffer_shv | {args.cash_buffer_pct:.1%} | "
-             f"{return_cash:+.2f}% | ${result_cash['final_equity']:,.2f} | 0 |"]
-            if args.cash_buffer_pct > 0 else []
-        ),
-        "",
-        "## SPY buy & hold (context only — not a hurdle)",
-        f"- Total return: {spy_return:+.2f}%",
-        f"- Annualized: {spy_ann:+.2f}%",
-        f"- Max drawdown: {spy_mdd:.2f}%",
-        f"- Sharpe: {spy_sharpe:.2f}",
-        "",
-        "## Absolute target evaluation",
-        f"| Criterion | Result | Actual |",
-        f"|---|---|---:|",
-        f"| Annualized return ≥ {TARGET_ANNUAL_RETURN_LOW}% (low target) | "
-        f"{'PASS' if hit_low else 'FAIL'} | {ann_return:.2f}% |",
-        f"| Annualized return ≥ {TARGET_ANNUAL_RETURN_HIGH}% (high target) | "
-        f"{'PASS' if hit_high else 'FAIL'} | {ann_return:.2f}% |",
-        f"| Max drawdown ≤ {MAX_DRAWDOWN_CAP}% | {'PASS' if dd_ok else 'FAIL'} | {mdd:.2f}% |",
-        f"| Sharpe ≥ {MIN_SHARPE} | {'PASS' if sharpe_ok else 'FAIL'} | {sharpe:.2f} |",
-        "",
-        f"**Overall: {'PASS' if overall else 'FAIL'}**",
-        "",
-        *(
-            [
-                "## Circuit-breaker",
-                f"- Thresholds: FULL → HALF @ {args.cb_half_dd:.1%} DD, "
-                f"HALF → OUT @ {args.cb_out_dd:.1%} DD, "
-                f"HALF → FULL @ {args.cb_recovery_dd:.1%} DD, "
-                f"OUT → HALF @ {args.cb_out_recover_dd:.1%} DD.",
-                f"- Throttle events: {len(cb_events)} over the window.",
-                "",
-                "| Date | From | To | Drawdown | Portfolio |",
-                "|---|---|---|---:|---:|",
-                *[f"| {ev['date']} | {ev['from']} | {ev['to']} | "
-                  f"{ev['dd_pct']:.2f}% | ${ev['portfolio']:,.0f} |"
-                  for ev in cb_events],
-                "",
-            ]
-            if args.circuit_breaker else []
-        ),
-        "## Caveats",
-        "- Backtest uses yfinance survivor-biased current S&P 100 large-cap universe;",
-        "  large_cap_momentum_top5 results are optimistic for periods where losers were excluded.",
-        "- Includes ~4 bps round-trip friction (1bp slippage + 1bp half-spread per side).",
-        "- No tax modeling — real-world returns would be lower for short-term gains.",
-        "- 12-month momentum warmup means actual trading window is "
-        f"{warmup} days shorter than the calendar window.",
-        *(
-            ["- Cash buffer is STATIC (no rebalancing). As strategies compound, the cash share of "
-             "the portfolio shrinks, so its DD protection weakens in later years. A rebalanced "
-             "variant would have lower returns and lower DD."]
-            if args.cash_buffer_pct > 0 else []
-        ),
-        *(
-            ["- Circuit-breaker is post-hoc on daily returns: the throttle scales today's "
-             "strategy-leg contribution to portfolio return; the cash leg earns SHV's daily "
-             "return. This is an approximation — a true live circuit-breaker would execute "
-             "rebalance trades on the day of the trigger and pay friction. Real-world results "
-             "would be marginally worse (a few bps per transition)."]
-            if args.circuit_breaker else []
-        ),
-    ]
-    report_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"  Report: {report_file.relative_to(REPO_ROOT)}")
+    # --- Write report (skip when write_report=False) ---
+    if write_report:
+        report_dir = REPO_ROOT / "backtests" / "multi_strategy_portfolio"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        suffix = f"_{args.label}" if args.label else ""
+        report_file = report_dir / f"{start_date}_to_{end_date}{suffix}.md"
+        lines = [
+            f"# Multi-strategy backtest — {start_date} → {end_date}",
+            "",
+            "## Portfolio result",
+            f"- Initial capital: ${args.capital:,.2f}",
+            f"- Final equity: ${final_equity:,.2f}",
+            f"- Total return: {total_return:+.2f}%",
+            f"- **Annualized return: {ann_return:+.2f}%**",
+            f"- **Max drawdown: {mdd:.2f}%**",
+            f"- **Sharpe (rough): {sharpe:.2f}**",
+            f"- Years: {years:.2f}",
+            "",
+            "## Allocations and per-strategy contribution",
+            f"- Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, static — no rebalancing)",
+            f"- Deployed: ${deployed_capital:,.0f}",
+            "",
+            "| Strategy | Allocation (of total) | Return | Final equity | Trades |",
+            "|---|---:|---:|---:|---:|",
+            f"| dual_momentum_taa | {ALLOCATION['dual_momentum_taa'] * deployed_frac:.1%} | "
+            f"{result_a.total_return_pct:+.2f}% | ${result_a.final_equity:,.2f} | "
+            f"{sum(1 for t in result_a.trades if t['side'] == 'EXIT')} |",
+            f"| large_cap_momentum_top5 | {ALLOCATION['large_cap_momentum_top5'] * deployed_frac:.1%} | "
+            f"{result_b.total_return_pct:+.2f}% | ${result_b.final_equity:,.2f} | "
+            f"{sum(1 for t in result_b.trades if t['side'] == 'EXIT')} |",
+            f"| gold_permanent_overlay | {ALLOCATION['gold_permanent_overlay'] * deployed_frac:.1%} | "
+            f"{return_c:+.2f}% | ${final_c:,.2f} | "
+            f"{sum(1 for t in result_c['trades'] if t['side'] == 'EXIT')} |",
+            *(
+                [f"| cash_buffer_shv | {args.cash_buffer_pct:.1%} | "
+                 f"{return_cash:+.2f}% | ${result_cash['final_equity']:,.2f} | 0 |"]
+                if args.cash_buffer_pct > 0 else []
+            ),
+            "",
+            "## SPY buy & hold (context only — not a hurdle)",
+            f"- Total return: {spy_return:+.2f}%",
+            f"- Annualized: {spy_ann:+.2f}%",
+            f"- Max drawdown: {spy_mdd:.2f}%",
+            f"- Sharpe: {spy_sharpe:.2f}",
+            "",
+            "## Absolute target evaluation",
+            f"| Criterion | Result | Actual |",
+            f"|---|---|---:|",
+            f"| Annualized return ≥ {TARGET_ANNUAL_RETURN_LOW}% (low target) | "
+            f"{'PASS' if hit_low else 'FAIL'} | {ann_return:.2f}% |",
+            f"| Annualized return ≥ {TARGET_ANNUAL_RETURN_HIGH}% (high target) | "
+            f"{'PASS' if hit_high else 'FAIL'} | {ann_return:.2f}% |",
+            f"| Max drawdown ≤ {MAX_DRAWDOWN_CAP}% | {'PASS' if dd_ok else 'FAIL'} | {mdd:.2f}% |",
+            f"| Sharpe ≥ {MIN_SHARPE} | {'PASS' if sharpe_ok else 'FAIL'} | {sharpe:.2f} |",
+            "",
+            f"**Overall: {'PASS' if overall else 'FAIL'}**",
+            "",
+            *(
+                [
+                    "## Circuit-breaker",
+                    f"- Thresholds: FULL → HALF @ {args.cb_half_dd:.1%} DD, "
+                    f"HALF → OUT @ {args.cb_out_dd:.1%} DD, "
+                    f"HALF → FULL @ {args.cb_recovery_dd:.1%} DD, "
+                    f"OUT → HALF @ {args.cb_out_recover_dd:.1%} DD.",
+                    f"- Throttle events: {len(cb_events)} over the window.",
+                    "",
+                    "| Date | From | To | Drawdown | Portfolio |",
+                    "|---|---|---|---:|---:|",
+                    *[f"| {ev['date']} | {ev['from']} | {ev['to']} | "
+                      f"{ev['dd_pct']:.2f}% | ${ev['portfolio']:,.0f} |"
+                      for ev in cb_events],
+                    "",
+                ]
+                if args.circuit_breaker else []
+            ),
+            "## Caveats",
+            "- Backtest uses yfinance survivor-biased current S&P 100 large-cap universe;",
+            "  large_cap_momentum_top5 results are optimistic for periods where losers were excluded.",
+            "- Includes ~4 bps round-trip friction (1bp slippage + 1bp half-spread per side).",
+            "- No tax modeling — real-world returns would be lower for short-term gains.",
+            "- 12-month momentum warmup means actual trading window is "
+            f"{warmup} days shorter than the calendar window.",
+            *(
+                ["- Cash buffer is STATIC (no rebalancing). As strategies compound, the cash share of "
+                 "the portfolio shrinks, so its DD protection weakens in later years. A rebalanced "
+                 "variant would have lower returns and lower DD."]
+                if args.cash_buffer_pct > 0 else []
+            ),
+            *(
+                ["- Circuit-breaker is post-hoc on daily returns: the throttle scales today's "
+                 "strategy-leg contribution to portfolio return; the cash leg earns SHV's daily "
+                 "return. This is an approximation — a true live circuit-breaker would execute "
+                 "rebalance trades on the day of the trigger and pay friction. Real-world results "
+                 "would be marginally worse (a few bps per transition)."]
+                if args.circuit_breaker else []
+            ),
+        ]
+        report_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"  Report: {report_file.relative_to(REPO_ROOT)}")
 
-    return 0
+    n_trades = (
+        sum(1 for t in result_a.trades if t["side"] == "EXIT")
+        + sum(1 for t in result_b.trades if t["side"] == "EXIT")
+        + sum(1 for t in result_c["trades"] if t["side"] == "EXIT")
+    )
+
+    return {
+        "ann_return": ann_return,
+        "max_drawdown_pct": mdd,
+        "sharpe": sharpe,
+        "final_equity": final_equity,
+        "cb_events": cb_events,
+        "n_trades": n_trades,
+        "equity_curve": portfolio_curve,
+        "overall": overall,
+        "hit_low": hit_low,
+        "hit_high": hit_high,
+        "dd_ok": dd_ok,
+        "sharpe_ok": sharpe_ok,
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--start", default="2005-01-01")
+    parser.add_argument("--end", default="2026-05-08")
+    parser.add_argument("--capital", type=float, default=100_000.0)
+    parser.add_argument("--alloc-a", type=float, default=DEFAULT_ALLOCATION["dual_momentum_taa"],
+                        help="Allocation for dual_momentum_taa (0-1)")
+    parser.add_argument("--alloc-b", type=float, default=DEFAULT_ALLOCATION["large_cap_momentum_top5"],
+                        help="Allocation for large_cap_momentum_top5 (0-1)")
+    parser.add_argument("--alloc-c", type=float, default=DEFAULT_ALLOCATION["gold_permanent_overlay"],
+                        help="Allocation for gold_permanent_overlay (0-1)")
+    parser.add_argument("--cash-buffer-pct", type=float, default=0.0,
+                        help="Fraction of total capital held in SHV as a cash buffer (0-0.95). "
+                             "alloc-a/b/c are interpreted as shares of the deployed portion "
+                             "and must still sum to 1.0; their effective share of total capital "
+                             "is alloc_i * (1 - cash_buffer_pct).")
+    parser.add_argument("--circuit-breaker", action="store_true",
+                        help="Apply portfolio-level drawdown circuit-breaker. Throttle state "
+                             "machine: FULL (100%% strategies) → HALF (50%%) at --cb-half-dd → "
+                             "OUT (0%%) at --cb-out-dd. Recover to FULL when DD ≤ --cb-recovery-dd. "
+                             "When throttled, the remainder sits in SHV.")
+    parser.add_argument("--cb-half-dd", type=float, default=0.08,
+                        help="Drawdown that trips FULL → HALF (default 0.08 = 8%%).")
+    parser.add_argument("--cb-out-dd", type=float, default=0.12,
+                        help="Drawdown that trips HALF → OUT (default 0.12 = 12%%).")
+    parser.add_argument("--cb-recovery-dd", type=float, default=0.05,
+                        help="Drawdown below which HALF → FULL (default 0.05 = 5%%). "
+                             "Provides hysteresis vs the 8%% HALF trigger.")
+    parser.add_argument("--cb-out-recover-dd", type=float, default=0.08,
+                        help="Drawdown below which OUT → HALF (default 0.08 = 8%%). "
+                             "Asymmetric vs cb-recovery-dd: tight hysteresis around HALF, "
+                             "fast recovery from OUT.")
+    parser.add_argument("--label", default="",
+                        help="Optional tag included in the report filename")
+    parser.add_argument("--no-report", dest="write_report", action="store_false",
+                        help="Skip writing the markdown report (used by sweep scripts)")
+    parser.set_defaults(write_report=True)
+    args = parser.parse_args()
+    result = run_backtest(args)
+    return 0 if result["overall"] else 1
 
 
 if __name__ == "__main__":
