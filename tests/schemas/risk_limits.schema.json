@@ -80,11 +80,29 @@
     "gates": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["require_human_approval_for_live_trades", "minimum_paper_trading_days_before_live", "minimum_paper_trades_before_live"],
+      "required": ["require_human_approval_for_live_trades", "minimum_paper_trading_days_before_live", "minimum_paper_trades_before_live", "regime_diversity_gates"],
       "properties": {
         "require_human_approval_for_live_trades": { "type": "boolean", "const": true },
         "minimum_paper_trading_days_before_live": { "type": "integer", "minimum": 30 },
-        "minimum_paper_trades_before_live": { "type": "integer", "minimum": 30 }
+        "minimum_paper_trades_before_live": { "type": "integer", "minimum": 30 },
+        "regime_diversity_gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "require_cb_throttle_event",
+            "require_spy_trend_flip",
+            "require_vix_high_observed",
+            "minimum_distinct_months"
+          ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "require_cb_throttle_event": { "type": "boolean" },
+            "require_spy_trend_flip": { "type": "boolean" },
+            "require_vix_high_observed": { "type": "number", "exclusiveMinimum": 0 },
+            "minimum_distinct_months": { "type": "integer", "minimum": 1 }
+          }
+        }
       }
     },
     "data": {

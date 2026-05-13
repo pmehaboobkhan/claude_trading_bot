@@ -34,6 +34,44 @@ gates:
   require_human_approval_for_live_trades: true
   minimum_paper_trading_days_before_live: 60
   minimum_paper_trades_before_live: 50
+  # Regime-diversity gates: paper-trading evidence must demonstrate the system
+  # has survived at least one stress event before live unlock is permitted.
+  # All flags must evaluate true for the monthly_review routine to recommend
+  # PROPOSE_HUMAN_APPROVED_LIVE.
+  regime_diversity_gates:
+    enabled: true
+    # At least one circuit-breaker transition (FULL→HALF or worse) must have
+    # occurred in paper-trading history. Proves the breaker actually engages.
+    require_cb_throttle_event: true
+    # At least one full SPY 10-month-SMA trend flip (above→below or below→above)
+    # must have occurred during the paper-trading window. Proves the trend
+    # filter actually flipped state, not just held one regime the whole time.
+    require_spy_trend_flip: true
+    # At least one observed daily VIX close ≥ this level during the window.
+    # 25 is "elevated" — not a panic, just non-benign volatility.
+    require_vix_high_observed: 25.0
+    # Minimum number of distinct calendar months in the paper-trading window
+    # (must be ≥ 4 for any seasonal evidence to mean anything).
+    minimum_distinct_months: 4
+  # Regime-diversity gates: paper-trading evidence must demonstrate the system
+  # has survived at least one stress event before live unlock is permitted.
+  # All flags must evaluate true for the monthly_review routine to recommend
+  # PROPOSE_HUMAN_APPROVED_LIVE.
+  regime_diversity_gates:
+    enabled: true
+    # At least one circuit-breaker transition (FULL→HALF or worse) must have
+    # occurred in paper-trading history. Proves the breaker actually engages.
+    require_cb_throttle_event: true
+    # At least one full SPY 10-month-SMA trend flip (above→below or below→above)
+    # must have occurred during the paper-trading window. Proves the trend
+    # filter actually flipped state, not just held one regime the whole time.
+    require_spy_trend_flip: true
+    # At least one observed daily VIX close ≥ this level during the window.
+    # 25 is "elevated" — not a panic, just non-benign volatility.
+    require_vix_high_observed: 25.0
+    # Minimum number of distinct calendar months in the paper-trading window
+    # (must be ≥ 4 for any seasonal evidence to mean anything).
+    minimum_distinct_months: 4
 data:
   max_data_staleness_seconds: 60
 cost_caps:
