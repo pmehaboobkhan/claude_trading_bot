@@ -26,3 +26,15 @@
 - Position held; no fill, no close.
 - Mark (2026-05-07 bar close): $92.14. Unrealized PnL: +$31.96 (+0.54%).
 - cb_state=FULL, throttle=1.0.
+
+## 2026-05-13 — PAPER_CLOSE (pre_close, overnight_risk)
+
+- Decision file: `decisions/2026-05-13/1536_CSCO.json`
+- Routine: pre_close_2026-05-13, mode PAPER_TRADING, cb_state=OUT (peak inflated artifact; exposure_fraction(OUT) throttles new opens, not closes).
+- Reason: `overnight_risk` — Cisco Q3 FY26 earnings scheduled 2026-05-13 AMC (after market close, 4:30 PM ET conference call). Sources: Cisco IR press release, Stocktitan, MarketBeat. Options-implied one-day move ~9.87% (TipRanks). Single-stock idiosyncratic catalyst with no diversifying counterweight; pre-close routine is specifically designed to refuse this kind of asymmetric overnight exposure.
+- Quote: $101.19 (Alpaca IEX live, 0.7s staleness).
+- Fill: 65 shares CLOSE @ $101.1698 (slippage applied via lib.fills).
+- Realized PnL: **+$618.90** (+10.13% on $5,957.14 cost basis).
+- Risk Manager: APPROVED (exit-side, no sizing-cap concerns; daily-loss & daily-trades headroom intact). Compliance: APPROVED (PAPER_TRADING permits PAPER_CLOSE; CSCO in watchlist; schema valid; sources cited).
+- Position closed. Active strategies: none on CSCO post-close.
+- Re-entry rule per the EOD routine: if CSCO remains in the top-5 momentum slate after the earnings print and the SPY trend filter still passes, EOD lib.signals will re-issue ENTRY and the routine can re-open on the EOD price. This close does not lock out re-entry.

@@ -1,13 +1,4 @@
 {
-  "CSCO": {
-    "entry_price": 91.6483,
-    "entry_ts": "2026-05-12T20:02:25.323129+00:00",
-    "quantity": 65,
-    "rationale_link": "decisions/2026-05-12/2000_CSCO.json",
-    "side": "BUY",
-    "stop_loss": 82.467,
-    "take_profit": 114.5375
-  },
   "GLD": {
     "entry_price": 430.7861,
     "entry_ts": "2026-05-12T20:02:25.322259+00:00",

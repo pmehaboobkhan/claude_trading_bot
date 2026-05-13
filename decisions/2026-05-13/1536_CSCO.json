@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-13T19:36:30Z",
+  "routine_id": "pre_close_2026-05-13",
+  "symbol": "CSCO",
+  "decision": "PAPER_CLOSE",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "Held since 2026-05-12 entry on rank-3 momentum (6m +25.97%); position currently +10.41% unrealized (mark $101.19 vs entry $91.6483). Underlying momentum thesis intact (no EXIT signal from lib.signals; not breaching stop or target). Closing pre-emptively here forfeits the next-day continuation of the trend — if earnings are positive we re-establish on the EOD signal at tomorrow's close.",
+  "thesis_bear": "CSCO reports Q3 FY26 earnings TODAY 2026-05-13 AMC (after market close). This is a single-stock idiosyncratic catalyst with no diversifying counterweight in the book; options market implies a ~9.87% one-day move on the print (per TipRanks earnings preview). A 10% gap-down would push CSCO to ~$91, near our $91.65 entry — wiping the +10% unrealized gain and consuming roughly half the per-trade stop budget on a single overnight event we can see coming. The trade was sized as a momentum carry, not an earnings-window play. Pre-close is exactly the routine designed to refuse this kind of asymmetric overnight exposure.",
+  "invalidation_condition": "Earnings catalyst removed: Cisco postpones the Q3 FY26 release. Per Cisco IR press release dated 2026-04 (cited below) the release is scheduled for 2026-05-13 AMC. As of routine timestamp 19:36 UTC (15:36 ET, ~24 minutes pre-close) no postponement has been published. If Cisco postpones, this overnight-risk-driven close becomes unnecessary and we re-enter on the EOD ENTRY confirmation.",
+  "risk_reward": {
+    "entry": 91.6483,
+    "stop": 82.467,
+    "target": 114.5375,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 65,
+    "usd": 6577.35,
+    "pct_of_account": 6.58
+  },
+  "confidence_score": 0.85,
+  "confidence_notes": "High confidence in the close: the catalyst is verified (multiple sources, see provenance), the asymmetry is real (sized as momentum carry, exposed to earnings-window gap), and pre_close.md explicitly mandates this behaviour for known overnight catalysts. The 0.15 residual uncertainty covers: (a) the possibility that today's late-day quote source has a feed-version mismatch like yesterday's IEX bar regression, (b) the possibility that Cisco delays the release, and (c) general regret that we may close into a positive print and forgo upside — accepted by routine design.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "Inline risk-manager review at 19:36 UTC: symbol CSCO is in watchlist.yaml with approved_for_paper_trading=true; strategy large_cap_momentum_top5 is in allowed_strategies (no disallowed flag); decision class PAPER_CLOSE is exit-side so per-trade R/R, sizing caps, sector-correlation caps, and total-exposure caps do not apply (closing reduces exposure). Daily-loss check: realized loss from this close = $-2.59 (1 cent slippage round-trip on 65 shares against +10.41% MTM gain — net realized pnl approximately +$586 after slippage). Daily PnL utilization remains 0% on the daily-loss limit. Trades-today: 1/5 after this close, under the cap. Open positions after: 4/8, under the cap. Data freshness: 0.7s, well under 60s staleness limit. No permission flags involved (no margin, options, shorts, leverage). Verdict: APPROVED.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "Inline compliance review at 19:36 UTC: mode PAPER_TRADING permits PAPER_CLOSE; CSCO approved for paper trading; strategy in allowed list; risk_manager_verdict=APPROVED; bull/bear/invalidation all present and non-empty; sources cited with URLs in data_provenance; schema-compliant (all required fields present); no live execution class. Verdict: APPROVED.",
+  "human_approval_required": false,
+  "final_status": "PAPER_FILLED",
+  "fill": {
+    "timestamp": "2026-05-13T19:39:01.978540+00:00",
+    "simulated_fill_price": 101.1698,
+    "quantity": 65,
+    "realized_pnl_usd": 618.90,
+    "log_row": "trades/paper/log.csv (appended)",
+    "rationale_link": "decisions/2026-05-13/1536_CSCO.json"
+  },
+  "data_provenance": {
+    "quote_source": "lib.data.get_latest_quote (Alpaca IEX live)",
+    "quote": 101.19,
+    "quote_ts": "2026-05-13T19:36:30.138115+00:00",
+    "quote_staleness_seconds": 0.7,
+    "earnings_catalyst_source_1": "https://investor.cisco.com/news/news-details/2026/Cisco-Schedules-Conference-Call-for-Q3-Fiscal-Year-2026-Financial-Results/default.aspx",
+    "earnings_catalyst_source_2": "https://www.stocktitan.net/news/CSCO/cisco-schedules-conference-call-for-q3-fiscal-year-2026-financial-0ynswasi6z36.html",
+    "earnings_catalyst_source_3": "https://www.marketbeat.com/earnings/reports/2026-5-13-cisco-systems-inc-stock/",
+    "earnings_catalyst_summary": "Cisco Q3 FY26 earnings release scheduled 2026-05-13 AMC (after close, 4:30 PM ET conference call). Period ending 2026-04-25. Multiple independent sources concur.",
+    "implied_move_source": "https://www.tipranks.com/news/cisco-is-about-to-report-q3-earnings-options-traders-expect-a-major-move-in-csco-stock",
+    "implied_move_pct": 9.87,
+    "regime": "bullish_trend (medium confidence; partly feed-artifact per pre_market journal note)",
+    "circuit_breaker_state": "OUT (peak inflated artifact; closes are not throttled by exposure_fraction(OUT)=0.0 — that throttles new opens only)",
+    "routine_rationale": "pre_close.md Step 9 — 'any open position with material overnight risk → propose PAPER_CLOSE with reason overnight_risk: <event>'. Reason: overnight_risk: CSCO Q3 FY26 earnings AMC tonight."
+  }
+}
