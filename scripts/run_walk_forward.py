@@ -27,6 +27,11 @@ sys.path.insert(0, str(REPO_ROOT))
 from lib.walk_forward import generate_windows, select_best, aggregate_oos, add_years  # noqa: E402
 from scripts import run_multi_strategy_backtest as mod  # noqa: E402
 
+# Engine requires ~252 trading days of warmup before signals fire.
+# We pass an extra year of bars before each OOS window so the engine has
+# enough history; it then internally trims the equity_curve to OOS dates.
+WARMUP_YEARS = 1
+
 # Smaller IS grid than Task 2 -- walk-forward runs this 5-10 times per fold
 # so we cap candidates to keep total runtime reasonable.
 IS_GRID = [
@@ -102,14 +107,19 @@ def main() -> int:
               f"IS MDD={chosen['metrics']['mdd']:.2f}%)")
 
         # OOS run with chosen params.
-        # The backtest engine requires > 252 warmup days before the evaluation window.
-        # Pass a data-fetch start 1 year before oos_s so the engine consumes that
-        # pre-OOS data as warmup and evaluates only within [oos_s, oos_e].
-        oos_data_start = add_years(oos_s, -1)
-        oos = mod.run_backtest(make_args(oos_data_start, oos_e,
+        # The backtest engine requires > 252 warmup days before signal evaluation.
+        # Pass a *fetch* start 1 year before oos_s so the engine consumes pre-OOS
+        # data as warmup; the engine internally trims the equity_curve to start
+        # after warmup, so the resulting metrics are over [oos_s, oos_e].
+        oos_fetch_start = add_years(oos_s, -WARMUP_YEARS)
+        oos = mod.run_backtest(make_args(oos_fetch_start, oos_e,
                                          p["half_dd"], p["out_dd"],
                                          p["h_to_f"], p["o_to_h"]))
-        oos_returns = daily_returns_from_curve(oos["equity_curve"])
+        # Defense in depth: filter equity_curve to dates >= oos_s explicitly.
+        # The engine already trims warmup, but pinning this behavior here protects
+        # against future engine changes that might leave warmup-period entries in.
+        oos_curve = [(d, v) for d, v in oos["equity_curve"] if d >= oos_s]
+        oos_returns = daily_returns_from_curve(oos_curve)
         print(f"  OOS: CAGR={oos['ann_return']:+.2f}% "
               f"MDD={oos['max_drawdown_pct']:.2f}% Sharpe={oos['sharpe']:.2f}")
 

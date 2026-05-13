@@ -88,3 +88,19 @@ def test_aggregate_oos_empty_returns_zeros():
     assert agg["chained_cagr"] == 0.0
     assert agg["chained_mdd"] == 0.0
     assert agg["chained_sharpe"] == 0.0
+
+
+def test_daily_returns_from_curve_computes_pct_changes():
+    """daily_returns_from_curve returns (curve[i] / curve[i-1]) - 1 per pair."""
+    from scripts.run_walk_forward import daily_returns_from_curve
+    curve = [("2020-01-01", 100.0), ("2020-01-02", 101.0), ("2020-01-03", 102.01)]
+    returns = daily_returns_from_curve(curve)
+    assert len(returns) == 2
+    assert abs(returns[0] - 0.01) < 1e-9
+    assert abs(returns[1] - 0.01) < 1e-9
+
+
+def test_daily_returns_from_curve_empty_or_single_returns_empty():
+    from scripts.run_walk_forward import daily_returns_from_curve
+    assert daily_returns_from_curve([]) == []
+    assert daily_returns_from_curve([("2020-01-01", 100.0)]) == []
