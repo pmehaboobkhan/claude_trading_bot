@@ -34,6 +34,7 @@ from typing import Literal
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STATE_PATH = REPO_ROOT / "trades" / "paper" / "circuit_breaker.json"
+HISTORY_PATH = REPO_ROOT / "trades" / "paper" / "circuit_breaker_history.jsonl"
 
 State = Literal["FULL", "HALF", "OUT"]
 
@@ -214,16 +215,32 @@ def advance(
     thresholds: CircuitBreakerThresholds,
     *,
     path: Path | None = None,
+    history_path: Path | None = None,
 ) -> CircuitBreakerStep:
     """Load → step → save in one call. Convenience for routine code.
 
     Routines call this once per run with today's portfolio equity. If a
-    transition occurs, the routine is responsible for writing a
-    `logs/risk_events/<ts>_circuit_breaker.md` entry — `advance` itself does
-    no logging (keeps this module testable without filesystem side-effects
-    beyond the state file).
+    transition occurs, `advance` appends a JSONL row to `history_path` (defaults
+    to `HISTORY_PATH`) so the live-trading-gate evaluator can audit CB history.
+    No-op ticks (no state change) do NOT touch the history file.
+
+    Row schema:
+      {timestamp, from_state, to_state, dd_pct, observed_equity, peak_equity}
     """
     state = load_state(path)
     result = step(state, current_equity, thresholds)
     save_state(result.new_state, path=path, last_observed_equity=current_equity)
+    if result.transitioned:
+        hp = history_path or HISTORY_PATH
+        hp.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "from_state": result.previous_state,
+            "to_state": result.new_state.state,
+            "dd_pct": round(result.drawdown * 100.0, 4),
+            "observed_equity": current_equity,
+            "peak_equity": result.new_state.peak_equity,
+        }
+        with hp.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
     return result

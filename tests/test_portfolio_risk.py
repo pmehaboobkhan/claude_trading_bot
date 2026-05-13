@@ -282,25 +282,27 @@ def test_save_state_records_diagnostic_equity(tmp_path) -> None:
 
 def test_advance_loads_steps_and_saves(tmp_path) -> None:
     p = tmp_path / "cb.json"
+    h = tmp_path / "h.jsonl"
     # First call: no state file yet → fresh state, equity becomes peak.
-    r1 = advance(100_000.0, CircuitBreakerThresholds(), path=p)
+    r1 = advance(100_000.0, CircuitBreakerThresholds(), path=p, history_path=h)
     assert r1.new_state.state == "FULL"
     assert r1.new_state.peak_equity == 100_000.0
     # Second call with a 9% drop → should trigger HALF and persist.
-    r2 = advance(91_000.0, CircuitBreakerThresholds(), path=p)
+    r2 = advance(91_000.0, CircuitBreakerThresholds(), path=p, history_path=h)
     assert r2.transitioned is True
     assert r2.new_state.state == "HALF"
     # Third call: state must be reloaded from disk, not re-initialised.
-    r3 = advance(91_500.0, CircuitBreakerThresholds(), path=p)
+    r3 = advance(91_500.0, CircuitBreakerThresholds(), path=p, history_path=h)
     assert r3.new_state.state == "HALF"  # still HALF, no whipsaw
     assert r3.new_state.peak_equity == 100_000.0  # peak preserved
 
 
 def test_advance_persists_state_across_calls(tmp_path) -> None:
     p = tmp_path / "cb.json"
-    advance(100_000.0, CircuitBreakerThresholds(), path=p)
-    advance(85_000.0, CircuitBreakerThresholds(), path=p)  # 15% DD → HALF
-    advance(83_000.0, CircuitBreakerThresholds(), path=p)  # 17% DD → OUT
+    h = tmp_path / "h.jsonl"
+    advance(100_000.0, CircuitBreakerThresholds(), path=p, history_path=h)
+    advance(85_000.0, CircuitBreakerThresholds(), path=p, history_path=h)  # 15% DD → HALF
+    advance(83_000.0, CircuitBreakerThresholds(), path=p, history_path=h)  # 17% DD → OUT
     # File should now reflect OUT state.
     loaded = load_state(p)
     assert loaded.state == "OUT"
@@ -365,6 +367,85 @@ def test_portfolio_equity_negative_cash_rejected(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(paper_sim, "POSITIONS_PATH", tmp_path / "positions.json")
     with pytest.raises(ValueError, match="non-negative"):
         paper_sim.portfolio_equity({}, cash_balance=-1.0)
+
+
+# ---------------------------------------------------------------------------
+# History log: circuit_breaker_history.jsonl
+# ---------------------------------------------------------------------------
+
+def test_advance_appends_history_on_state_change(tmp_path) -> None:
+    """When advance() flips state, it appends a JSONL row to circuit_breaker_history.jsonl."""
+    from lib import portfolio_risk as pr
+
+    state_path = tmp_path / "circuit_breaker.json"
+    history_path = tmp_path / "circuit_breaker_history.jsonl"
+
+    # Initialise FULL with peak 100; observe equity 91 → DD = 9% → should flip to HALF
+    pr.save_state(pr.CircuitBreakerState(state="FULL", peak_equity=100.0),
+                  path=state_path, last_observed_equity=100.0)
+
+    pr.advance(
+        current_equity=91.0,
+        thresholds=pr.CircuitBreakerThresholds(),
+        path=state_path,
+        history_path=history_path,
+    )
+
+    assert history_path.exists(), "history file should be created on first transition"
+    rows = [json.loads(line) for line in history_path.read_text().splitlines() if line.strip()]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["from_state"] == "FULL"
+    assert row["to_state"] == "HALF"
+    assert "timestamp" in row
+    assert abs(row["dd_pct"] - 9.0) < 0.01
+    assert abs(row["observed_equity"] - 91.0) < 0.01
+    assert abs(row["peak_equity"] - 100.0) < 0.01
+
+
+def test_advance_does_not_append_history_when_state_unchanged(tmp_path) -> None:
+    """Steady FULL → FULL must not write to history."""
+    from lib import portfolio_risk as pr
+
+    state_path = tmp_path / "circuit_breaker.json"
+    history_path = tmp_path / "circuit_breaker_history.jsonl"
+
+    pr.save_state(pr.CircuitBreakerState(state="FULL", peak_equity=100.0),
+                  path=state_path, last_observed_equity=100.0)
+
+    pr.advance(
+        current_equity=99.5,  # tiny dip, still FULL (DD=0.5% < 8% half_dd)
+        thresholds=pr.CircuitBreakerThresholds(),
+        path=state_path,
+        history_path=history_path,
+    )
+
+    assert not history_path.exists() or history_path.read_text().strip() == ""
+
+
+def test_advance_appends_multiple_transitions_to_history(tmp_path) -> None:
+    """Two transitions → two rows; history is genuinely append-only."""
+    from lib import portfolio_risk as pr
+
+    state_path = tmp_path / "circuit_breaker.json"
+    history_path = tmp_path / "circuit_breaker_history.jsonl"
+
+    pr.save_state(pr.CircuitBreakerState(state="FULL", peak_equity=100.0),
+                  path=state_path, last_observed_equity=100.0)
+
+    # First transition: FULL → HALF
+    pr.advance(current_equity=91.0,
+               thresholds=pr.CircuitBreakerThresholds(),
+               path=state_path, history_path=history_path)
+    # Second transition: HALF → OUT
+    pr.advance(current_equity=87.0,  # 13% DD from peak 100
+               thresholds=pr.CircuitBreakerThresholds(),
+               path=state_path, history_path=history_path)
+
+    rows = [json.loads(line) for line in history_path.read_text().splitlines() if line.strip()]
+    assert len(rows) == 2
+    assert (rows[0]["from_state"], rows[0]["to_state"]) == ("FULL", "HALF")
+    assert (rows[1]["from_state"], rows[1]["to_state"]) == ("HALF", "OUT")
 
 
 if __name__ == "__main__":

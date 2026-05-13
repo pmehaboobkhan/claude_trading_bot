@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Enforce append-only on:
 #   - trades/paper/log.csv
+#   - trades/paper/circuit_breaker_history.jsonl
 #   - decisions/by_symbol/*.md
 # A change is "append-only" iff the existing file content is a strict prefix
 # of the new content. Edit/MultiEdit on these files is rejected entirely
@@ -14,7 +15,7 @@ file_path="$(hook_field tool_input.file_path)"
 
 is_append_only_file=false
 case "$file_path" in
-  *trades/paper/log.csv|*decisions/by_symbol/*.md) is_append_only_file=true ;;
+  *trades/paper/log.csv|*trades/paper/circuit_breaker_history.jsonl|*decisions/by_symbol/*.md) is_append_only_file=true ;;
 esac
 $is_append_only_file || allow
 
