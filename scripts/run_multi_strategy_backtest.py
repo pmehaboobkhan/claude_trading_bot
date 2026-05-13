@@ -410,7 +410,7 @@ def run_backtest(args) -> dict:
     # --- Strategy A: dual_momentum_taa ---
     cap_a = deployed_capital * ALLOCATION["dual_momentum_taa"]
     print(f"\n[strategy A] dual_momentum_taa ${cap_a:,.0f}...")
-    sma_months = getattr(args, "sma_months", 10)
+    sma_months = args.sma_months
     t0 = time.time()
     result_a = backtest.run_backtest(
         strategy="dual_momentum_taa",

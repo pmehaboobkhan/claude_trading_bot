@@ -160,6 +160,38 @@ def test_taa_explicit_params_210_days_matches_default() -> None:
     )
 
 
+def test_taa_huge_ma_window_returns_no_signals() -> None:
+    """Oversized windows exhaust bar history and return [] (no signals possible).
+
+    Proves the parameter is actually wired into the SMA computation
+    path, not just dict-passed and ignored.
+
+    With 280 bars but ma_window_days=10_000 (and momentum_window_days=10_000
+    so the cash-floor check also fails), the early-exit guard fires before any
+    signal is produced.  If ma_window_days were silently ignored the function
+    would use the 210-day default and return a non-empty signal list.
+    """
+    bars = {
+        "SPY": _trend_bars(280, start=400, daily_pct=0.0015),
+        "IEF": _trend_bars(280, start=100, daily_pct=0.0002),
+        "GLD": _trend_bars(280, start=180, daily_pct=0.0001),
+        "SHV": _trend_bars(280, start=110, daily_pct=0.00015),
+    }
+    regime = signals.RegimeReading("bullish_trend", "medium", {}, [])
+    huge_window_signals = signals.evaluate_dual_momentum_taa(
+        bars,
+        watchlist_symbols=list(bars.keys()),
+        regime=regime,
+        strategy_rules={},
+        params={"ma_window_days": 10_000, "momentum_window_days": 10_000},
+    )
+    assert huge_window_signals == [], (
+        "ma_window_days=10000 / momentum_window_days=10000 should return [] when bar "
+        "history is shorter than the window; if it returned signals, the params aren't "
+        "being consumed by the SMA / momentum computation path."
+    )
+
+
 def test_taa_returns_empty_when_required_symbols_missing() -> None:
     """If SHV is missing, can't compute cash floor — return no signals."""
     bars = {"SPY": _trend_bars(280), "IEF": _trend_bars(280), "GLD": _trend_bars(280)}
