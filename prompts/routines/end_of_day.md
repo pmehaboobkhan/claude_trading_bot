@@ -115,10 +115,30 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
        risk_events=[<short summary of any logs/risk_events/ entries today>],
        notable="<one paragraph; what would matter to tomorrow's pre_market>",
        watch_tomorrow=[<up to 5 items: earnings, macro events, expiring conditions>],
+       spy_above_10mo_sma=<bool — see guidance below>,
+       vix_close=<float or None — see guidance below>,
    )
    snapshots.write_snapshot(snap)
    PYSNAP
    ```
+
+   ### Snapshot fields for live-trading gate
+
+   When constructing the `DailySnapshot`:
+
+   - `spy_above_10mo_sma`: boolean — set to whether today's SPY close is above its
+     210-trading-day SMA (10 months). This value is computed during Strategy A's
+     evaluation; capture and pass it through. The `signals.evaluate_dual_momentum_taa`
+     call internally uses `indicators.above_sma(spy_closes, 210)`; the returned
+     signal object exposes this as a filter flag. Capture it and pass it here.
+
+   - `vix_close`: float — today's VIX close price.
+     - **Alpaca free IEX tier does NOT provide VIX.** Set to `None` until a
+       VIX-capable feed is wired (e.g. paid Alpaca tier, Polygon, or Tiingo).
+     - The live-trading-gate evaluator will fail the `vix_high_observed` check
+       when VIX data is absent across the entire window. This is intentional —
+       going live requires evidence the system has seen elevated volatility.
+
    The snapshot must stay ≤ 1 KB — keep list items terse, narrative under
    ~3 sentences. Tomorrow's pre_market reads this instead of the full journal.
 
