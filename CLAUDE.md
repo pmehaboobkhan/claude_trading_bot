@@ -28,6 +28,7 @@ The current mode lives in `config/approved_modes.yaml`. Read it on every routine
 
 - `RESEARCH_ONLY` — produces reports and decisions; no paper or live trades.
 - `PAPER_TRADING` — simulates fills via internal simulator or Alpaca paper API.
+- `SAFE_MODE` — deterministic engine only. Same trading actions as `PAPER_TRADING`, but learning-related writes (`memory/` except daily snapshots, `prompts/proposed_updates/`, `self_learning` agent) are suppressed. The "last known good" execution state when LLM behavior degrades or memory has accumulated noise. Entry via `/enter-safe-mode <reason>`; resume requires explicit human PR back to `PAPER_TRADING`.
 - `LIVE_PROPOSALS` — emits `PROPOSE_LIVE_*` decisions for human approval. No live orders.
 - `LIVE_EXECUTION` — Phase 8+ only; places live orders within hard limits.
 - `HALTED` — refuses all trading-hour routines; allows read-only inspection.
@@ -137,6 +138,13 @@ Adding a new symbol to the watchlist → human only (Self-Learning Agent may **p
 
 - Set `config/approved_modes.yaml > mode: HALTED` via the `/halt-trading <reason>` slash command, which writes a paired `logs/risk_events/` entry. Direct edits without the audit-log pair are rejected by hook #11.
 - Resume requires a human PR explicitly setting mode back.
+
+## How to enter SAFE_MODE
+
+- Use the `/enter-safe-mode <reason>` slash command (writes a paired `logs/risk_events/` entry, then sets `config/approved_modes.yaml > mode: SAFE_MODE`). Direct edits without the audit-log pair are rejected by hook #11.
+- SAFE_MODE keeps the deterministic engine running: signals, paper fills, circuit-breaker, journals, decisions all continue. What stops: every kind of learning write (memory updates, prompt proposals, self-learning agent invocations).
+- Resume to PAPER_TRADING requires a human PR explicitly setting mode back. There is no auto-resume.
+- Use SAFE_MODE when prompts misbehave, model providers degrade, or memory has accumulated low-quality heuristics — situations where the deterministic strategy is still trustworthy but the LLM stack needs inspection without halting trading entirely.
 
 ## Performance tracking (every weekly and monthly review)
 
