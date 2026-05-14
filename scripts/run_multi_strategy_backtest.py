@@ -396,22 +396,49 @@ def run_backtest(args) -> dict:
     # filter for META/TSLA/V in long-window (pre-2012) backtests.
     bars = filter_bars_by_listing(bars)
 
-    # Align all symbols to the window.
-    aligned = align_bars(bars, start_date=args.start, end_date=args.end)
+    # Align symbols to the window.
+    # Strategy: use only symbols with data back to args.start as the "anchor" for
+    # finding common trading dates. Symbols that IPO'd mid-window (META 2012,
+    # TSLA 2010, V 2008) are included in bars but not in the alignment anchor set —
+    # they will naturally have < momentum_window bars in early years and be
+    # excluded from top-N selection by the signals layer until they have enough history.
+    # This allows long-window backtests (start=2007) to work correctly even though
+    # META/TSLA/V don't exist until later.
+    anchor_syms = {sym for sym, b in bars.items()
+                   if b and b[0]["ts"][:10] <= args.start}
+    bars_anchor = {sym: b for sym, b in bars.items() if sym in anchor_syms}
+    if not bars_anchor:
+        # Fallback: align everything (production windows where all symbols have data)
+        bars_anchor = bars
+    aligned = align_bars(bars_anchor, start_date=args.start, end_date=args.end)
     if "SPY" not in aligned:
         raise RuntimeError("no SPY in aligned data")
     sample_len = len(next(iter(aligned.values())))
     sample_first = next(iter(aligned.values()))[0]["ts"][:10]
     sample_last = next(iter(aligned.values()))[-1]["ts"][:10]
     universe_size = len(aligned)
+
+    # For symbols that IPO'd mid-window, trim their bars to the common trading-day grid
+    # established by the anchor symbols. This ensures consistent date indexing.
+    common_dates = {b["ts"][:10] for b in next(iter(aligned.values()))}
+    for sym, sym_bars in bars.items():
+        if sym not in aligned:
+            aligned[sym] = [b for b in sym_bars
+                            if args.start <= b["ts"][:10] <= args.end
+                            and b["ts"][:10] in common_dates]
+
     print(f"[fetch] aligned to {sample_len} common days ({sample_first} → {sample_last}); "
-          f"{universe_size} symbols pass alignment")
+          f"{len([s for s in aligned if aligned[s]])} symbols in aligned window")
+    n_mid_window = len([s for s in aligned if s not in anchor_syms and aligned[s]])
+    if n_mid_window:
+        print(f"[fetch] {n_mid_window} symbols IPO'd mid-window; "
+              f"excluded from early-year top-N via bars-length gate in signals layer")
 
     # Some large-cap stocks may IPO mid-window. They drop out of alignment, which biases the
     # large-cap-momentum universe toward survivors with the longest history. For 2005+ we
     # may lose META (IPO 2012), V (IPO 2008), TSLA (IPO 2010), MA (IPO 2006).
     if universe_size < 8:
-        print(f"[fetch] WARNING: only {universe_size} symbols in aligned window — "
+        print(f"[fetch] WARNING: only {universe_size} anchor symbols in aligned window — "
               f"large-cap momentum may have a thin universe")
 
     rules = config.strategy_rules()
