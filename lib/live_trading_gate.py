@@ -219,25 +219,16 @@ def load_default_inputs(*, performance_summary: dict) -> GateInputs:
 
 
 def _parse_snapshot(path: Path) -> dict | None:
-    """Parse a daily snapshot for the fields we care about.
+    """Parse a daily snapshot for the fields the live-trading gate needs.
 
-    Snapshots are markdown with a known structure; we extract just the
-    date, spy_above_10mo_sma, and vix_close fields if present. Missing
-    fields are tolerated (recorded as None).
+    Reads the YAML frontmatter (managed by lib.snapshots.write_snapshot).
+    Missing optional fields tolerated (recorded as None).
     """
+    from lib.snapshots import parse_frontmatter
     text = path.read_text(encoding="utf-8")
-    out: dict = {"date": path.stem, "spy_above_10mo_sma": None, "vix_close": None}
-    for line in text.splitlines():
-        # Conventional snapshot markers (extend as the snapshot format evolves):
-        #   `- spy_above_10mo_sma: true`
-        #   `- vix_close: 22.4`
-        s = line.strip().lstrip("-* ").strip()
-        if s.startswith("spy_above_10mo_sma:"):
-            v = s.split(":", 1)[1].strip().lower()
-            out["spy_above_10mo_sma"] = v in ("true", "yes", "1")
-        elif s.startswith("vix_close:"):
-            try:
-                out["vix_close"] = float(s.split(":", 1)[1].strip())
-            except ValueError:
-                pass
-    return out
+    fm = parse_frontmatter(text)
+    return {
+        "date": fm.get("date") or path.stem,
+        "spy_above_10mo_sma": fm.get("spy_above_10mo_sma"),
+        "vix_close": fm.get("vix_close"),
+    }

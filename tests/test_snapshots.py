@@ -196,5 +196,65 @@ def test_parse_frontmatter_parses_types_correctly(tmp_path) -> None:
     assert fm["pnl_today_usd"] == pytest.approx(-1500.50)
 
 
+def test_snapshot_includes_spy_trend_and_vix_when_provided(tmp_path) -> None:
+    """Optional fields appear in frontmatter only when caller provides them."""
+    snap = DailySnapshot(
+        date="2026-05-13",
+        regime="bullish_trend",
+        regime_confidence="medium",
+        circuit_breaker_state="FULL",
+        circuit_breaker_dd_pct=2.5,
+        pnl_today_usd=42.0,
+        pnl_today_pct=0.04,
+        open_positions_count=3,
+        trades_executed=1,
+        mode="PAPER_TRADING",
+        spy_above_10mo_sma=False,
+        vix_close=27.4,
+    )
+    out = write_snapshot(snap, dir_path=tmp_path)
+    body = out.read_text()
+    assert "spy_above_10mo_sma: false" in body
+    assert "vix_close: 27.4" in body
+
+
+def test_snapshot_omits_spy_trend_and_vix_when_not_provided(tmp_path) -> None:
+    """Optional fields absent from frontmatter when None."""
+    snap = DailySnapshot(
+        date="2026-05-13",
+        regime="bullish_trend",
+        regime_confidence="medium",
+        circuit_breaker_state="FULL",
+        circuit_breaker_dd_pct=2.5,
+        pnl_today_usd=42.0,
+        pnl_today_pct=0.04,
+        open_positions_count=3,
+        trades_executed=1,
+        mode="PAPER_TRADING",
+    )
+    out = write_snapshot(snap, dir_path=tmp_path)
+    body = out.read_text()
+    assert "spy_above_10mo_sma" not in body
+    assert "vix_close" not in body
+
+
+def test_snapshot_invalid_vix_close_raises() -> None:
+    """vix_close above 200 is rejected."""
+    with pytest.raises(ValueError, match="vix"):
+        DailySnapshot(
+            date="2026-05-13",
+            regime="bullish_trend",
+            regime_confidence="medium",
+            circuit_breaker_state="FULL",
+            circuit_breaker_dd_pct=2.5,
+            pnl_today_usd=0.0,
+            pnl_today_pct=0.0,
+            open_positions_count=0,
+            trades_executed=0,
+            mode="PAPER_TRADING",
+            vix_close=250.0,
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

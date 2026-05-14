@@ -46,6 +46,8 @@ class DailySnapshot:
     risk_events: list[str] = field(default_factory=list)
     notable: str = ""
     watch_tomorrow: list[str] = field(default_factory=list)
+    spy_above_10mo_sma: bool | None = None  # Optional: today's SPY 10mo-SMA filter state
+    vix_close: float | None = None          # Optional: today's VIX close (from broker quote feed)
 
     def __post_init__(self) -> None:
         if self.regime_confidence not in ("low", "medium", "high"):
@@ -59,6 +61,10 @@ class DailySnapshot:
         if not 0 <= self.circuit_breaker_dd_pct <= 100:
             raise ValueError(
                 f"circuit_breaker_dd_pct must be in [0, 100], got {self.circuit_breaker_dd_pct}"
+            )
+        if self.vix_close is not None and not 0 <= self.vix_close <= 200:
+            raise ValueError(
+                f"vix_close must be in [0, 200], got {self.vix_close}"
             )
 
 
@@ -80,6 +86,10 @@ def write_snapshot(snap: DailySnapshot, *, dir_path: Path | None = None) -> Path
         "trades_executed": snap.trades_executed,
         "mode": snap.mode,
     }
+    if snap.spy_above_10mo_sma is not None:
+        frontmatter["spy_above_10mo_sma"] = bool(snap.spy_above_10mo_sma)
+    if snap.vix_close is not None:
+        frontmatter["vix_close"] = float(snap.vix_close)
 
     def _bullets(items: list[str], empty: str = "(none)") -> str:
         if not items:

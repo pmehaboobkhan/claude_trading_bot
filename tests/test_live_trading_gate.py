@@ -156,3 +156,37 @@ def test_evaluate_gates_disabled_returns_pass_with_warning():
     assert verdict.overall_pass is True
     assert verdict.warning is not None
     assert "disabled" in verdict.warning.lower()
+
+
+def test_load_default_inputs_reads_frontmatter_fields(tmp_path, monkeypatch):
+    """A real snapshot file with the new frontmatter fields is correctly parsed."""
+    import lib.live_trading_gate as gate
+    from lib.snapshots import DailySnapshot, write_snapshot
+
+    # Write a real snapshot to a tmp path with both new fields set
+    snap_dir = tmp_path / "memory" / "daily_snapshots"
+    snap_dir.mkdir(parents=True)
+    write_snapshot(DailySnapshot(
+        date="2026-05-13",
+        regime="bullish_trend", regime_confidence="medium",
+        circuit_breaker_state="FULL", circuit_breaker_dd_pct=2.5,
+        pnl_today_usd=42.0, pnl_today_pct=0.04,
+        open_positions_count=3, trades_executed=1,
+        mode="PAPER_TRADING",
+        spy_above_10mo_sma=False, vix_close=27.4,
+    ), dir_path=snap_dir)
+
+    # Patch the gate's REPO_ROOT to point at tmp
+    monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
+    perf = {
+        "paper_trading_days": 30,
+        "closed_paper_trades": 10,
+        "portfolio_sharpe": 0.9,
+        "portfolio_max_drawdown_pct": 8.0,
+    }
+    inputs = gate.load_default_inputs(performance_summary=perf)
+    assert len(inputs.daily_snapshots) == 1
+    s = inputs.daily_snapshots[0]
+    assert s["date"] == "2026-05-13"
+    assert s["spy_above_10mo_sma"] is False
+    assert abs(s["vix_close"] - 27.4) < 1e-6
