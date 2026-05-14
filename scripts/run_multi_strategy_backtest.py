@@ -149,10 +149,16 @@ def run_strategy_c_gld_permanent(bars: dict, *, start_date: str, end_date: str,
 # ---------------------------------------------------------------------------
 
 def run_cash_bucket_shv(bars: dict, *, start_date: str, end_date: str,
-                       capital: float) -> dict:
-    """Hold SHV from start_date to end_date. No friction (it's cash; we never trade it)."""
-    shv_bars = bars["SHV"]
-    in_window = [b for b in shv_bars if start_date <= b["ts"][:10] <= end_date]
+                       capital: float, cash_proxy: str = "SHV") -> dict:
+    """Hold the cash proxy from start_date to end_date. No friction (cash; we never trade it).
+
+    Args:
+        cash_proxy: The ETF symbol to use as the cash equivalent (SHV, BIL, or SHY).
+                    Default SHV. BIL/SHY are used for long-window backtests starting
+                    before SHV's 2007 listing date.
+    """
+    proxy_bars = bars[cash_proxy]
+    in_window = [b for b in proxy_bars if start_date <= b["ts"][:10] <= end_date]
     if not in_window:
         return {"equity_curve": [], "final_equity": capital}
     start_price = float(in_window[0]["close"])
@@ -304,7 +310,9 @@ def run_backtest(args) -> dict:
                 start, end, capital, alloc_a, alloc_b, alloc_c,
                 cash_buffer_pct, circuit_breaker,
                 cb_half_dd, cb_out_dd, cb_recovery_dd, cb_out_recover_dd,
-                label, write_report (optional, defaults True).
+                label, write_report (optional, defaults True),
+                cash_proxy (optional, defaults "SHV" — use BIL or SHY for
+                            long-window backtests before SHV's 2007 listing).
 
     Returns a dict with keys:
         ann_return        – annualized return (%)
@@ -321,6 +329,7 @@ def run_backtest(args) -> dict:
         sharpe_ok         – bool: sharpe ≥ MIN_SHARPE
     """
     write_report = getattr(args, "write_report", True)
+    cash_proxy = getattr(args, "cash_proxy", "SHV")
 
     if not 0.0 <= args.cash_buffer_pct < 0.95:
         raise ValueError(f"cash_buffer_pct out of range: {args.cash_buffer_pct}")
@@ -345,7 +354,7 @@ def run_backtest(args) -> dict:
     print(f"  Window: {args.start} → {args.end}")
     print(f"  Capital: ${args.capital:,.0f}")
     if args.cash_buffer_pct > 0:
-        print(f"  Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, no rebalancing)")
+        print(f"  Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in {cash_proxy}, no rebalancing)")
         print(f"  Deployed: ${deployed_capital:,.0f}")
         print(f"  Effective allocations (of total): "
               f"A={ALLOCATION['dual_momentum_taa'] * deployed_frac:.0%} "
@@ -363,10 +372,16 @@ def run_backtest(args) -> dict:
     watchlist = config.watchlist()
     symbols = [s["symbol"] for s in watchlist["symbols"]]
 
-    # Need TLT and SHV in addition to watchlist (already there). Pull all symbols.
-    print(f"[fetch] pulling {len(symbols)} symbols from yfinance...")
+    # If a non-default cash proxy (BIL, SHY) is requested and not in the watchlist,
+    # add it to the fetch list. The watchlist always has SHV.
+    symbols_to_fetch = list(symbols)
+    if cash_proxy not in symbols_to_fetch:
+        symbols_to_fetch.append(cash_proxy)
+        print(f"[fetch] adding {cash_proxy} (alternate cash proxy, not in watchlist)")
+
+    print(f"[fetch] pulling {len(symbols_to_fetch)} symbols from yfinance...")
     bars: dict[str, list[dict]] = {}
-    for sym in symbols:
+    for sym in symbols_to_fetch:
         try:
             bars[sym] = fetch_bars_yfinance(sym)
         except Exception as exc:
@@ -453,17 +468,18 @@ def run_backtest(args) -> dict:
     return_c = (final_c / cap_c - 1) * 100
     print(f"  return {return_c:+.2f}%")
 
-    # --- Cash bucket: SHV buy-and-hold for the cash buffer portion ---
+    # --- Cash bucket: cash proxy buy-and-hold for the cash buffer portion ---
     result_cash = {"equity_curve": [], "final_equity": 0.0}
     return_cash = 0.0
     if args.cash_buffer_pct > 0 and cash_capital > 0:
-        print(f"\n[cash bucket] SHV buy-and-hold ${cash_capital:,.0f}...")
+        print(f"\n[cash bucket] {cash_proxy} buy-and-hold ${cash_capital:,.0f}...")
         result_cash = run_cash_bucket_shv(
             aligned, start_date=start_date, end_date=end_date, capital=cash_capital,
+            cash_proxy=cash_proxy,
         )
         if result_cash["final_equity"] > 0:
             return_cash = (result_cash["final_equity"] / cash_capital - 1) * 100
-            print(f"  return {return_cash:+.2f}% (treasury bills via SHV)")
+            print(f"  return {return_cash:+.2f}% (treasury bills via {cash_proxy})")
 
     # --- Portfolio combine ---
     curves_to_combine = [
@@ -486,9 +502,10 @@ def run_backtest(args) -> dict:
             result_b.equity_curve,
             result_c["equity_curve"],
         ])
-        # SHV reference curve on $1 of capital — only used for daily returns inside CB.
+        # Cash proxy reference curve on $1 of capital — only used for daily returns inside CB.
         shv_ref = run_cash_bucket_shv(
             aligned, start_date=start_date, end_date=end_date, capital=1.0,
+            cash_proxy=cash_proxy,
         )["equity_curve"]
         # CB starts with the deployed capital (strategy capital), not args.capital,
         # so the cash buffer (if any) is preserved and added back at the end.
@@ -611,7 +628,8 @@ def run_backtest(args) -> dict:
             f"- Years: {years:.2f}",
             "",
             "## Allocations and per-strategy contribution",
-            f"- Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in SHV, static — no rebalancing)",
+            f"- Cash proxy: {cash_proxy} (used for Strategy A cash floor and cash buffer)",
+            f"- Cash buffer: {args.cash_buffer_pct:.0%} (${cash_capital:,.0f} in {cash_proxy}, static — no rebalancing)",
             f"- Deployed: ${deployed_capital:,.0f}",
             "",
             "| Strategy | Allocation (of total) | Return | Final equity | Trades |",
@@ -626,7 +644,7 @@ def run_backtest(args) -> dict:
             f"{return_c:+.2f}% | ${final_c:,.2f} | "
             f"{sum(1 for t in result_c['trades'] if t['side'] == 'EXIT')} |",
             *(
-                [f"| cash_buffer_shv | {args.cash_buffer_pct:.1%} | "
+                [f"| cash_buffer_{cash_proxy.lower()} | {args.cash_buffer_pct:.1%} | "
                  f"{return_cash:+.2f}% | ${result_cash['final_equity']:,.2f} | 0 |"]
                 if args.cash_buffer_pct > 0 else []
             ),
@@ -681,11 +699,11 @@ def run_backtest(args) -> dict:
                 if args.cash_buffer_pct > 0 else []
             ),
             *(
-                ["- Circuit-breaker is post-hoc on daily returns: the throttle scales today's "
-                 "strategy-leg contribution to portfolio return; the cash leg earns SHV's daily "
-                 "return. This is an approximation — a true live circuit-breaker would execute "
-                 "rebalance trades on the day of the trigger and pay friction. Real-world results "
-                 "would be marginally worse (a few bps per transition)."]
+                [f"- Circuit-breaker is post-hoc on daily returns: the throttle scales today's "
+                 f"strategy-leg contribution to portfolio return; the cash leg earns {cash_proxy}'s daily "
+                 f"return. This is an approximation — a true live circuit-breaker would execute "
+                 f"rebalance trades on the day of the trigger and pay friction. Real-world results "
+                 f"would be marginally worse (a few bps per transition)."]
                 if args.circuit_breaker else []
             ),
         ]
@@ -730,15 +748,20 @@ def main() -> int:
     parser.add_argument("--alloc-c", type=float, default=DEFAULT_ALLOCATION["gold_permanent_overlay"],
                         help="Allocation for gold_permanent_overlay (0-1)")
     parser.add_argument("--cash-buffer-pct", type=float, default=0.0,
-                        help="Fraction of total capital held in SHV as a cash buffer (0-0.95). "
+                        help="Fraction of total capital held as a cash buffer (0-0.95). "
                              "alloc-a/b/c are interpreted as shares of the deployed portion "
                              "and must still sum to 1.0; their effective share of total capital "
                              "is alloc_i * (1 - cash_buffer_pct).")
+    parser.add_argument("--cash-proxy", default="SHV", choices=["SHV", "BIL", "SHY"],
+                        help="Cash proxy for Strategy A cash floor and cash-bucket allocation. "
+                             "Use BIL or SHY for windows that start before SHV's 2007-01-11 listing. "
+                             "BIL (launched 2007-05-30) and SHY (launched 2002-07-26) are short-T-bill "
+                             "equivalents with slightly different yield characteristics. Default: SHV.")
     parser.add_argument("--circuit-breaker", action="store_true",
                         help="Apply portfolio-level drawdown circuit-breaker. Throttle state "
                              "machine: FULL (100%% strategies) → HALF (50%%) at --cb-half-dd → "
                              "OUT (0%%) at --cb-out-dd. Recover to FULL when DD ≤ --cb-recovery-dd. "
-                             "When throttled, the remainder sits in SHV.")
+                             "When throttled, the remainder sits in the cash proxy.")
     parser.add_argument("--cb-half-dd", type=float, default=0.08,
                         help="Drawdown that trips FULL → HALF (default 0.08 = 8%%).")
     parser.add_argument("--cb-out-dd", type=float, default=0.12,

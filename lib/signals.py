@@ -134,20 +134,26 @@ def evaluate_dual_momentum_taa(
     regime: RegimeReading,
     strategy_rules: dict,
     params: dict | None = None,
+    cash_proxy: str = TAA_CASH_PROXY,
 ) -> list[Signal]:
-    """Antonacci-style dual momentum across SPY/TLT/GLD with cash floor (SHV).
+    """Antonacci-style dual momentum across SPY/TLT/GLD with cash floor (SHV/BIL/SHY).
 
     Rule book (deterministic):
       1. For each of {SPY, TLT, GLD}: compute 12-month total return AND check
          price > 10-month SMA. Symbols failing the SMA filter are excluded.
-      2. Compare survivors' 12m returns to SHV's 12m return (cash floor).
+      2. Compare survivors' 12m returns to cash_proxy's 12m return (cash floor).
       3. Hold the single survivor with the highest 12m return.
-      4. If no asset clears both filters, hold SHV (cash equivalent).
+      4. If no asset clears both filters, hold cash_proxy (cash equivalent).
 
     Optional params:
       momentum_window_days: int = 252      # ~12 months of trading days
       ma_window_days: int = 210            # ~10 months
       max_holdings: int = 1                # 1 = pure dual momentum; >1 = diversified
+
+    Args:
+      cash_proxy: Cash-equivalent symbol used as the return floor and safe-haven
+        destination. Default SHV. For long-window backtests starting before
+        SHV's 2007 listing, use BIL (launched 2007-05) or SHY (launched 2002).
     """
     p = params or {}
     momentum_window = int(p.get("momentum_window_days", 252))
@@ -155,12 +161,12 @@ def evaluate_dual_momentum_taa(
     max_holdings = int(p.get("max_holdings", 1))
 
     name = "dual_momentum_taa"
-    required = TAA_RISK_ASSETS + [TAA_CASH_PROXY]
+    required = TAA_RISK_ASSETS + [cash_proxy]
     missing = [s for s in required if s not in bars_by_symbol]
     if missing:
         return []
 
-    cash_closes = indicators.closes(bars_by_symbol[TAA_CASH_PROXY])
+    cash_closes = indicators.closes(bars_by_symbol[cash_proxy])
     if len(cash_closes) < momentum_window + 1:
         return []
     cash_return = (cash_closes[-1] / cash_closes[-momentum_window - 1]) - 1.0
@@ -222,10 +228,10 @@ def evaluate_dual_momentum_taa(
             rationale=f"{name}: {action} — {rationale_tail}",
         ))
 
-    # Cash floor signal: ENTRY into SHV iff no risk asset qualifies.
+    # Cash floor signal: ENTRY into cash_proxy iff no risk asset qualifies.
     cash_action = "ENTRY" if not winners else "EXIT"
     signals.append(Signal(
-        symbol=TAA_CASH_PROXY, action=cash_action, strategy=name,
+        symbol=cash_proxy, action=cash_action, strategy=name,
         confidence_inputs=inputs_summary,
         confirmations_passed=["No risk asset clears momentum + MA filters"] if cash_action == "ENTRY" else [],
         confirmations_failed=[] if cash_action == "ENTRY" else ["A risk asset is qualifying; cash exit"],
