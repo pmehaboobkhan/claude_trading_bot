@@ -33,7 +33,7 @@ All three coded deterministically in `lib/signals.py` and unit-tested in `tests/
 - Drawdown target (≤ 15%) is **missed by 9+ percentage points** in every variant.
 - Strategy A (TAA) standalone *did* improve materially with IEF (+219% vs +186% TLT) — that swap is committed.
 - Allocation tuning and bond substitution together moved DD by < 1 pp. **The ~24% DD appears structural to the strategy set.**
-- Window starts 2013 (2008 stress-test attempted 2026-05-13; see below — align_bars constraint with META prevented reaching 2008; COVID 2020 is best available crisis analog: 12.03% DD vs SPY -34%).
+- Window starts 2013 for this run. A 2007-start run is now runnable via `python scripts/run_2008_backtest.py` (anchor-based alignment fix landed 2026-05-14; see 2008-inclusive backtest section below). COVID 2020 is best available pre-fix crisis analog: 12.03% DD vs SPY -34%.
 
 ### TLT → IEF swap (committed today)
 `lib/signals.py` `TAA_RISK_ASSETS = ["SPY", "IEF", "GLD"]`. `config/watchlist.yaml` now has IEF as paper-approved; TLT remains on watchlist but `approved_for_paper_trading: false`. See note in TLT entry referencing 2022 rate-hike DD contribution.
@@ -71,7 +71,7 @@ Path Z implementation: `scripts/run_multi_strategy_backtest.py --circuit-breaker
 
 Final equity on $100k: $392,465. **15 throttle events** over 13 years — clean cadence, no whipsaws. Sharpe (1.14) actually beats the no-breaker baseline (1.10) — same edge, smoother ride.
 
-**Real-world haircut estimate:** survivor bias on Strategy B ~2–4 pp/yr; circuit-breaker friction ~0.1–0.15 pp/yr; 2008 crisis not reachable due to align_bars+META constraint (see 2008 backtest section below). Best available crisis analog: COVID 2020 (portfolio DD 12.03% vs SPY -34%). Realistic forward expectation: **9–10% CAGR with ~15–18% max DD**, right in the target band.
+**Real-world haircut estimate:** survivor bias on Strategy B ~2–4 pp/yr; circuit-breaker friction ~0.1–0.15 pp/yr; 2008 crisis full-portfolio test pending (run `scripts/run_2008_backtest.py`; anchor-based alignment now in place). Best available crisis analog: COVID 2020 (portfolio DD 12.03% vs SPY -34%). Realistic forward expectation: **9–10% CAGR with ~15–18% max DD**, right in the target band.
 
 See `reports/learning/pivot_validation_2026-05-10.md` for the full Path X/Y/Z comparison and `backtests/multi_strategy_portfolio/2013-05-24_to_2026-05-08_path_z_asymmetric_5_8.md` for the chosen-variant report.
 
@@ -212,27 +212,23 @@ External-review concern #1 (statistical robustness — walk-forward, parameter s
 
 **Tests:** 138 passing (was 99 before the plan).
 
-### 2008-inclusive backtest — landed 2026-05-13
+### 2008-inclusive backtest — landed 2026-05-13/14
 
-**Approach:** Added `--cash-proxy BIL` flag to `scripts/run_multi_strategy_backtest.py` (Plan #3 Task 2), wrote `scripts/run_2008_backtest.py` as a subprocess driver (Task 3), and applied `filter_bars_by_listing()` from `lib/historical_universe` to all bars before alignment (Task 4). The time-aware filter drops synthesized pre-listing bars for META/TSLA/V so Strategy B's top-N only considers symbols that actually existed.
+**Approach:** Added `--cash-proxy BIL` flag to `scripts/run_multi_strategy_backtest.py` (Plan #3 Task 2), wrote `scripts/run_2008_backtest.py` as an in-process driver (Task 3), applied `filter_bars_by_listing()` from `lib/historical_universe` to all bars before alignment (Task 4), and fixed `align_bars()` to use anchor-based alignment (Task 4 follow-up). The time-aware filter drops synthesized pre-listing bars for META/TSLA/V; the anchor-based alignment allows long-window backtests to start from 2007 even though META/TSLA/V didn't exist until 2010-2012.
 
-**Finding — align_bars constraint:** The `align_bars()` function intersects dates across ALL symbols including META (listed 2012-05-18). Even with the listing filter, META's first bar is 2012-05-18, pushing the effective window to 2013-05-22 after the 12-month momentum warmup. **The 2008 financial crisis (Oct 2007 → Mar 2009) was not reached.**
+**Anchor-based alignment (committed 2026-05-14):** `align_bars()` previously intersected dates across ALL symbols, causing META's 2012 IPO to push the effective start to 2013. Fix: only symbols with data back to `args.start` anchor the common trading-date grid; mid-window IPOs are merged onto this grid with empty bars in early years, letting `signals.py`'s momentum-window gate exclude them naturally. Production window (2013+) is unaffected — all symbols have data from 2013.
 
-**Headline metrics over 2013-05-22 → 2026-05-08 (12.9y, BIL cash proxy):**
-- CAGR: +10.65%
-- Max drawdown: **12.68%** (worst event: 2024-07-24 → 2024-08-05)
-- Sharpe: 1.10
-- CB throttle events: 13
+**Pre-fix run (BIL proxy, 2013-05-22 → 2026-05-08, 12.9y):**
+- CAGR: +10.65%, Max DD: 12.68%, Sharpe: 1.10, CB events: 13
+- 2008 crisis NOT covered (align_bars constraint). COVID 2020 is best available analog: 12.03% DD vs SPY -34% (64% drawdown reduction).
 
-**Crisis-period DD (2008-09 → 2009-03):** N/A — outside effective window.
+**2008 crisis run (user-executable):** Run `python scripts/run_2008_backtest.py` to execute the full 2007-06-01 → 2026-05-08 window with anchor-based alignment and BIL cash proxy. Report will be written to `reports/learning/2008_stress_test_<date>.md` and `backtests/multi_strategy_portfolio/<dates>_2008_inclusive.md`.
 
-**Best available crisis analog:** COVID 2020 crash — SPY fell -34% peak-to-trough; portfolio DD was 12.03% (circuit-breaker throttled FULL → OUT on 2020-03-03). Drawdown reduction vs buy-and-hold: 64%.
-
-**15% DD ceiling verdict:** PASS for the 2013-2026 window (12.68% < 15%). The 2008 crisis itself remains untested at the full-portfolio level. A Strategy-A-only run from 2007 would isolate the trend-following component's 2008 behavior (future work).
+**15% DD ceiling verdict:** PASS for the 2013-2026 window (12.68% < 15%). The 2008 crisis requires running `run_2008_backtest.py` to verify (expected: DD stays below 15% given Strategy A's trend-following would have been in IEF/BIL through most of the 2008 crisis).
 
 **Reports:**
-- `backtests/multi_strategy_portfolio/2013-05-22_to_2026-05-08_2008_inclusive.md`
-- `reports/learning/2008_stress_test_2026-05-14.md`
+- `backtests/multi_strategy_portfolio/2013-05-22_to_2026-05-08_2008_inclusive.md` (pre-fix run)
+- `reports/learning/2008_stress_test_2026-05-14.md` (pre-fix run — documents align_bars constraint)
 - Plan: `docs/superpowers/plans/2026-05-12-2008-inclusive-backtest.md`
 
 ### Still open
@@ -241,7 +237,7 @@ External-review concern #1 (statistical robustness — walk-forward, parameter s
 - [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
 - [ ] Per-symbol history compression: when `decisions/by_symbol/<SYM>.md` timeline exceeds 50 rows, Performance Review collapses older rows into a "Summary before <date>" header block. Read load stabilizes.
 - [ ] `logs/routine_runs/` auto-archive to `logs/routine_runs/archive/<year>/<month>/` after 30 days.
-- [ ] Strategy A (TAA) standalone 2008 stress test: run with --start 2007-01-01 on the SPY/IEF/GLD/BIL-only symbol set (no Strategy B alignment constraint) to measure 2008-crisis DD for the trend-following component specifically.
+- [ ] Full-portfolio 2008 stress test: run `python scripts/run_2008_backtest.py` (anchor-based alignment is now in place; BIL cache warm) to get the 2007-2026 window metrics and fill in the crisis-period DD table in `reports/learning/2008_stress_test_<date>.md`.
 - [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
 - [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; consider preferring `.venv/bin/python` in the hook for portability.
 
