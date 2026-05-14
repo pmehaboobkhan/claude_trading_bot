@@ -38,8 +38,22 @@ All three coded deterministically in `lib/signals.py` and unit-tested in `tests/
 ### TLT → IEF swap (committed today)
 `lib/signals.py` `TAA_RISK_ASSETS = ["SPY", "IEF", "GLD"]`. `config/watchlist.yaml` now has IEF as paper-approved; TLT remains on watchlist but `approved_for_paper_trading: false`. See note in TLT entry referencing 2022 rate-hike DD contribution.
 
-### Survivor bias caveat
-Strategy B's standalone +2005% (13y) is inflated by selecting today's mega-cap survivors. Realistic forward estimate after haircut: ~10–14% annualized. Backtest write-ups carry this caveat explicitly.
+### Survivor bias caveat (measured 2026-05-14)
+
+Strategy B's standalone +2005% (13y) is inflated by selecting today's mega-cap survivors. **The plan's prior "2-4 pp/yr" estimate was significantly optimistic** — the survivor-bias stress test (`reports/learning/survivor_bias_stress_2026-05-14.md`) measured the actual portfolio-level haircut by re-running the full 60/30/10 portfolio against a year-by-year point-in-time S&P 100 universe (`data/historical/sp100_as_of.json`).
+
+| Window | Universe | CAGR | MaxDD | Sharpe |
+|---|---|---:|---:|---:|
+| 2013-2026 | modern | +10.08% | 12.56% | 1.08 |
+| 2013-2026 | as_of | +9.69% | 12.33% | 0.93 |
+| **2007-2026** | **modern** | **+11.95%** | **12.67%** | **1.11** |
+| **2007-2026** | **as_of** | **+4.70%** | **12.94%** | **0.58** |
+
+**Headline finding:** the 2007-2026 portfolio-level CAGR drops from +11.95% (modern) to +4.70% (as_of) — a **7.25 pp/yr haircut**. Sharpe falls below the 0.8 portfolio target. The collapse is concentrated in 2008-2010 when the as_of basket holds Lehman / Bear / Wachovia / Merrill / AIG (mostly to ~zero). The 2013-2026 window shows a much smaller haircut (0.39 pp/yr) because the as_of basket from 2013 onward is dominated by names still in today's universe.
+
+**Implication for production:** Strategy B's edge in a forward 2008-class event is materially weaker than the modern-basket backtest implies. The 60/30/10 allocation was sized assuming a stronger Strategy B; **the allocation should be reviewed** (added to "Still open" below).
+
+The 2008 backtest itself (`reports/learning/2008_stress_test_*`) using the modern basket holds the 15% DD ceiling at 12.67% — that's the upper-bound friendly read. The honest forward expectation, accounting for the survivor-bias-corrected as_of result, is closer to **+6 to +9% CAGR with ~13-15% MaxDD** rather than the original +9-10% / 15-18% MaxDD estimate.
 
 ### Drawdown decision — RESOLVED 2026-05-11 via Path Z asymmetric circuit-breaker
 
@@ -231,9 +245,30 @@ External-review concern #1 (statistical robustness — walk-forward, parameter s
 - `reports/learning/2008_stress_test_2026-05-14.md` (pre-fix run — documents align_bars constraint)
 - Plan: `docs/superpowers/plans/2026-05-12-2008-inclusive-backtest.md`
 
+### Survivor-bias stress test — landed 2026-05-14
+
+External-review concern #5 (survivor bias on Strategy B) is closed. Five commits land the data + helpers + driver + plan update: `d3802df`, `d1eef66`, `9a15614`, plus the survivor-bias stress run today.
+
+**Headline:** see "Survivor bias caveat (measured 2026-05-14)" above. Portfolio CAGR collapses from +11.95% (modern, 2007-2026) to +4.70% (as_of, 2007-2026) — a **7.25 pp/yr haircut**, 3-4× larger than the plan's prior estimate. The 60/30/10 allocation should be reviewed (added to "Still open").
+
+Files: `data/historical/sp100_as_of.json` (22 years, 67 unique symbols), `lib/historical_membership.py`, `tests/test_historical_membership.py`, `scripts/run_survivor_bias_stress.py`. Reports: `reports/learning/survivor_bias_stress_2026-05-14.md` and `.json`.
+
+### SAFE_MODE — landed 2026-05-14
+
+External-review concern #4 (need a "frozen execution" mode for when LLM stack degrades) is closed. Eight commits land the operating-mode infrastructure: `244e05b`, `a58a814`, `9002d7f`, `567103b`, `24c2b73`, plus this plan update.
+
+Added a sixth operating mode: `SAFE_MODE`. Same deterministic strategy + paper-fill execution as `PAPER_TRADING`, but learning writes (`memory/` except `daily_snapshots/`, `prompts/proposed_updates/`, `self_learning` agent dispatches) are suppressed by both prompt-layer guards (in 6 routine prompts + the self_learning agent) and a file-layer hook (`.claude/hooks/safe_mode_writes.sh`).
+
+**Use case:** prompts misbehaving, model providers degrading, memory accumulating low-quality heuristics. Keep the deterministic engine running while the LLM stack is paused for inspection. Entry via `/enter-safe-mode <reason>` (paired audit log + mode flip + commit + Telegram); resume to `PAPER_TRADING` requires explicit human PR.
+
+Files: `lib/operating_mode.py` (12 tests), `.claude/hooks/safe_mode_writes.sh`, `.claude/commands/enter-safe-mode.md`, schema (`tests/schemas/approved_modes.schema.json`) + transitions doc (`config/approved_modes.yaml`). CLAUDE.md updated. Routine + agent guards land directly (Bash bypass per session consent).
+
 ### Still open
 
 - [ ] Operator action: set up the three new intraday monitoring routines on Claude Code web (same template as pre_market / end_of_day; cron per `config/routine_schedule.yaml`; same `calm-turtle` environment).
+- [ ] **Strategy B allocation review (URGENT-ish):** measured survivor-bias haircut of ~7.25 pp/yr at portfolio level (2007-2026 window) suggests Strategy B's allocated capital may need to drop from 30% (e.g., to 15-20%, with the freed allocation moving to gold or cash). Pending: re-run the multi-strategy backtest with revised allocations and confirm the 8-10% / 15% DD / Sharpe ≥ 0.8 targets still hold, especially against the 2007-2026 window.
+- [ ] **Alpaca free-tier daily-bar staleness (recurring):** IEX feed daily-bars lag 6-19 days behind real time. Plan: hybrid yfinance for daily bars + Alpaca for execution + intraday quotes. yfinance already in stack (used by backtests).
+- [ ] **VIX data source:** Alpaca free IEX does not provide VIX. Live-trading-gate `vix_high_observed` will permanently fail until a VIX-capable feed is wired (Polygon, Tiingo, or paid Alpaca tier).
 - [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
 - [ ] Per-symbol history compression: when `decisions/by_symbol/<SYM>.md` timeline exceeds 50 rows, Performance Review collapses older rows into a "Summary before <date>" header block. Read load stabilizes.
 - [ ] `logs/routine_runs/` auto-archive to `logs/routine_runs/archive/<year>/<month>/` after 30 days.

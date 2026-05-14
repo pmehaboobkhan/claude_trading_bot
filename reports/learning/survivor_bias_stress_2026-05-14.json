@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-05-14T10:54:24.738253Z",
+  "elapsed_seconds": 155,
+  "results": [
+    {
+      "cagr": "+10.08",
+      "mdd": "12.56",
+      "sharpe": "1.08",
+      "strat_b_return": "+1534.41",
+      "eff_start": "2014-05-27",
+      "eff_end": "2026-05-08",
+      "report_path": "backtests/multi_strategy_portfolio/2014-05-27_to_2026-05-08_survivor_modern_2013_2026.md",
+      "label": "survivor_modern_2013_2026",
+      "start": "2013-05-24",
+      "end": "2026-05-08",
+      "mode": "modern",
+      "cash": "SHV"
+    },
+    {
+      "cagr": "+9.69",
+      "mdd": "12.33",
+      "sharpe": "0.93",
+      "strat_b_return": "+1653.85",
+      "eff_start": "2014-05-27",
+      "eff_end": "2026-05-08",
+      "report_path": "backtests/multi_strategy_portfolio/2014-05-27_to_2026-05-08_survivor_asof_2013_2026.md",
+      "label": "survivor_asof_2013_2026",
+      "start": "2013-05-24",
+      "end": "2026-05-08",
+      "mode": "as_of",
+      "cash": "SHV"
+    },
+    {
+      "cagr": "+11.95",
+      "mdd": "12.67",
+      "sharpe": "1.11",
+      "strat_b_return": "+5351.08",
+      "eff_start": "2008-06-02",
+      "eff_end": "2026-05-08",
+      "report_path": "backtests/multi_strategy_portfolio/2008-06-02_to_2026-05-08_survivor_modern_2007_2026.md",
+      "label": "survivor_modern_2007_2026",
+      "start": "2007-06-01",
+      "end": "2026-05-08",
+      "mode": "modern",
+      "cash": "BIL"
+    },
+    {
+      "cagr": "+4.70",
+      "mdd": "12.94",
+      "sharpe": "0.58",
+      "strat_b_return": "+2924.52",
+      "eff_start": "2008-06-02",
+      "eff_end": "2026-05-08",
+      "report_path": "backtests/multi_strategy_portfolio/2008-06-02_to_2026-05-08_survivor_asof_2007_2026.md",
+      "label": "survivor_asof_2007_2026",
+      "start": "2007-06-01",
+      "end": "2026-05-08",
+      "mode": "as_of",
+      "cash": "BIL"
+    }
+  ],
+  "haircut": {
+    "portfolio_cagr_delta_2013_2026": 0.39,
+    "portfolio_cagr_delta_2007_2026": 7.25,
+    "strat_b_standalone_estimate_2013_2026": 1.3,
+    "strat_b_standalone_estimate_2007_2026": 24.17,
+    "needs_allocation_review": false
+  }
+}
