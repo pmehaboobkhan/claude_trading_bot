@@ -7,6 +7,9 @@
 *.p12
 .claude/settings.local.json
 
+# Runtime locks (transient — never commit)
+.claude/scheduled_tasks.lock
+
 # Python
 __pycache__/
 *.py[cod]
