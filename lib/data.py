@@ -1,11 +1,24 @@
-"""Alpaca market-data wrapper. IEX-only feed (free tier).
+"""Hybrid market-data wrapper.
+
+For DAILY bars: uses yfinance (free, full history, no SIP-tier paywall, fresh
+within 1 trading day vs Alpaca free IEX which lags 6-19 days). yfinance is
+already in our stack (used by backtests at backtests/_yfinance_cache/).
+
+For INTRADAY bars (1Hour, 5Min): uses Alpaca IEX (real-time quotes are
+sub-second; only daily-bar consolidation is the laggy endpoint).
+
+For LATEST QUOTE: uses Alpaca IEX (real-time, sub-second).
 
 Returns plain dicts so it composes easily with JSON-friendly outputs.
 Stamps every payload with a freshness timestamp. Caller compares against
 risk_limits.yaml > data > max_data_staleness_seconds.
+
+Override via env: BAR_SOURCE=alpaca to force the legacy all-Alpaca path
+(useful for A/B testing or if yfinance is rate-limiting).
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -73,12 +86,58 @@ def _calendar_days_for(timeframe: str, limit: int) -> int:
     raise ValueError(f"unsupported timeframe: {timeframe}")
 
 
-def get_bars(symbol: str, *, timeframe: str = "1Day", limit: int = 100) -> list[dict]:
-    """Fetch recent OHLCV bars. Used by `lib.signals` for indicator inputs.
+def _bar_source() -> str:
+    """Resolve which source to use for daily bars.
 
-    Always passes an explicit `start` date computed from `limit` — without it,
-    Alpaca's free IEX tier returns only the most recent bar.
+    Default: yfinance (avoids Alpaca free-tier daily-bar lag).
+    Env override: BAR_SOURCE=alpaca to force the legacy path.
     """
+    return os.environ.get("BAR_SOURCE", "yfinance").strip().lower()
+
+
+def _get_bars_yfinance(symbol: str, *, limit: int) -> list[dict]:
+    """Daily bars via yfinance.
+
+    Fresh within ~1 trading day (vs Alpaca free IEX which lags 6-19 days).
+    No API key required. Caller-side caching at backtests/_yfinance_cache/
+    is for backtests only — production routines fetch fresh.
+    """
+    try:
+        import yfinance as yf
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("yfinance not installed (required for daily bars)") from exc
+
+    end_dt = datetime.now(UTC)
+    start_dt = end_dt - timedelta(days=_calendar_days_for("1Day", limit))
+
+    df = yf.download(
+        symbol,
+        start=start_dt.strftime("%Y-%m-%d"),
+        end=end_dt.strftime("%Y-%m-%d"),
+        progress=False,
+        auto_adjust=True,
+        threads=False,
+    )
+    if df.empty:
+        return []
+    # Flatten multi-level columns if present (yfinance variant).
+    if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
+        df.columns = df.columns.get_level_values(0)
+    bars: list[dict] = []
+    for ts, row in df.iterrows():
+        bars.append({
+            "ts": ts.strftime("%Y-%m-%dT00:00:00+00:00"),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
+            "volume": int(row["Volume"]),
+        })
+    return bars[-limit:] if len(bars) > limit else bars
+
+
+def _get_bars_alpaca(symbol: str, *, timeframe: str, limit: int) -> list[dict]:
+    """Bars via Alpaca IEX. Used for intraday (real-time) and as the legacy daily path."""
     try:
         from alpaca.data.historical import StockHistoricalDataClient
         from alpaca.data.requests import StockBarsRequest
@@ -116,3 +175,18 @@ def get_bars(symbol: str, *, timeframe: str = "1Day", limit: int = 100) -> list[
         }
         for b in bars
     ]
+
+
+def get_bars(symbol: str, *, timeframe: str = "1Day", limit: int = 100) -> list[dict]:
+    """Fetch recent OHLCV bars. Used by `lib.signals` for indicator inputs.
+
+    Routing:
+      - timeframe == "1Day" AND BAR_SOURCE != "alpaca" → yfinance (fresh,
+        avoids Alpaca free-tier daily-bar lag of 6-19 days).
+      - All other cases → Alpaca IEX (real-time intraday or env-forced).
+
+    Returns the same dict shape regardless of source: {ts, open, high, low, close, volume}.
+    """
+    if timeframe == "1Day" and _bar_source() != "alpaca":
+        return _get_bars_yfinance(symbol, limit=limit)
+    return _get_bars_alpaca(symbol, timeframe=timeframe, limit=limit)

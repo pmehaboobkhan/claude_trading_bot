@@ -7,6 +7,7 @@ python-dateutil>=2.9
 pytz>=2024.1
 pandas>=2.2
 numpy>=1.26
+yfinance>=0.2.40   # daily-bar source for production routines (Alpaca free IEX lags 6-19 days)
 
 # Dev / tests
 pytest>=8.0
