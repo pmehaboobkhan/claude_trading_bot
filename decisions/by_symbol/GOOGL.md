@@ -35,3 +35,21 @@
 - Mark vs entry $397.9096 → -$235.19 (-3.94%). Stop $358.047 (6.3% headroom).
 - Decision: continue holding; no new decision file written. Position is now this session's largest single-name unrealized loss.
 - Watch tomorrow: monitor for further give-back. Stop is 6% below close so still ample headroom but tighter than yesterday.
+
+## 2026-05-14 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-14, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 1/21 +38.42% 6m, SPY trend up).
+- Quote at pre_close (19:41Z in-market): $401.68. Post-close IEX last $377.65 (degraded; bid $377.65 / ask $0.0 — discarded as a real mark).
+- Mark vs entry $397.9096 → **+$56.56 (+0.95%)**. Stop $358.047 (10.9% headroom — recovered vs yesterday's 6.3%).
+- Decision: continue holding; no new decision file written.
+- News flow this week: Anthropic ~$200B/5yr commitment to Google Cloud (2026-05-11); Googlebook product launch with Acer/ASUS/Dell/HP/Lenovo. Tone neutral-to-bullish. Next earnings 2026-07-22 (outside near-term window).
+
+**Cumulative stats (updated 2026-05-14 EOD):**
+
+- Open paper positions: 1 (qty 15 @ $397.9096)
+- Closed paper trades: 0
+- Realized PnL: $0.00
+- Unrealized PnL (mark $401.68): +$56.56 (+0.95%)
+- Win rate: n/a (no closed trades)
+- Active strategies: large_cap_momentum_top5

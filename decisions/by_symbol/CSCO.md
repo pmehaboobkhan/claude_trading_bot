@@ -55,3 +55,23 @@
 - Realized PnL: +$618.90
 - Win rate: 100% (1/1)
 - Active strategies: none on CSCO (signal ENTRY today but blocked at EOD)
+
+## 2026-05-14 — EOD signal still ENTRY, routed NO_TRADE (cb_OUT + staleness + post-earnings stale-bar)
+
+- Decision file: `decisions/2026-05-14/2038_CSCO.json`
+- Routine: end_of_day_2026-05-14, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 3/21, +25.61% 6m, SPY trend up).
+- Decision: **NO_TRADE** with reason `circuit_breaker_OUT AND data_staleness_breach AND post_earnings_no_fresh_evidence`.
+- Three stacking gates: (1) CB OUT throttle=0.0 → mechanically blocks new opens; (2) daily-bar staleness 6 calendar days >> 60s (latest bar 2026-05-08 predates yesterday's AMC earnings print); (3) re-entering within 24h of a pre-print exit without fresh post-earnings price evidence inverts the overnight-risk thesis used to capture +$618.90 — needs new evidence.
+- IEX post-close last $121.25 (bid $109.35 / ask $121.25 — wide spread; verify quote tightness next-session market hours before any re-entry).
+- Intended sizing pre-throttle: ~49 shares (~$5,941 ≈ 5.94% of $100k, Strategy B target 6%). Actual: 0 shares.
+- Risk Manager: APPROVED on NO_TRADE (reduces no risk). Compliance: APPROVED.
+- Cumulative stats unchanged: 1 closed paper trade, +$618.90 realized, 100% win rate (1/1). Open position count: 0. Re-entry remains conditional on (a) CB FULL/HALF AND (b) fresh post-earnings daily bar AND (c) rank ≤ 5 confirms on that fresh bar.
+
+**Cumulative stats (updated 2026-05-14 EOD):**
+
+- Open paper positions: 0
+- Closed paper trades: 1
+- Realized PnL: +$618.90
+- Win rate: 100% (1/1)
+- Active strategies: none on CSCO (signal ENTRY both days but blocked at EOD)

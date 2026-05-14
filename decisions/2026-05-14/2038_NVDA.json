@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-14T20:38:00Z",
+  "routine_id": "end_of_day_2026-05-14",
+  "symbol": "NVDA",
+  "decision": "NO_TRADE",
+  "strategy": "large_cap_momentum_top5",
+  "thesis_bull": "NVDA promoted from rank 7 (hold-zone) on 2026-05-13 to rank 5 (ENTRY) today on a +3.46pp 6m total-return move (+18.90% trailing 126-day), with SPY trend filter engaged (SPY above 10m MA per regime detector; spy_above_50dma=true, spy_above_200dma=true, +5.54% from 50dma). The deterministic signal evaluator at EOD reproduced this against the 0630.json pre-market snapshot — same rank 5/21, same ENTRY action.",
+  "thesis_bear": "Three stacking constraints make this an asymmetric NO_TRADE: (a) circuit-breaker state remains OUT (exposure_fraction=0.0) — new opens are mechanically blocked by Path Z policy because computed equity drawdown is 15.37% versus the persistent peak of $119,140.25 (acknowledged-inflated artifact; lessons-pending escalated to must-fix for the seventh consecutive routine); (b) daily-bar data is stale to 2026-05-08 (6 calendar days) — `max_data_staleness_seconds=60` exceeded by orders of magnitude — so opening on a rank computed from 6-day-old prices carries signal-staleness risk; (c) NVDA is just inside the cut-off (rank 5/21) and is the highest-beta name in the large-cap basket with the tightest watchlist cap (10% vs 15% standard). Any one constraint alone would prevent the open; together they reinforce the NO_TRADE.",
+  "invalidation_condition": "CB returns to FULL or HALF state (exposure_fraction > 0.0) AND daily-bar feed catches up to within `data.max_data_staleness_seconds`. Until both clear, this candidate stays in the watch column. If both clear and NVDA still confirms rank ≤ 5 at the next EOD, re-evaluate for a fresh entry decision with size respecting the 10% watchlist cap.",
+  "risk_reward": {
+    "entry": 235.25,
+    "stop": 211.725,
+    "target": 294.0625,
+    "ratio": 2.5
+  },
+  "position_size": {
+    "shares": 0,
+    "usd": 0,
+    "pct_of_account": 0,
+    "circuit_breaker_state": "OUT",
+    "throttle_applied": 0.0,
+    "intended_shares_pre_throttle": 25,
+    "intended_usd_pre_throttle": 5881.25,
+    "intended_pct_pre_throttle": 5.88,
+    "sizing_basis": "Strategy B target 6% of $100k account ≈ $6,000 at quote $235.25 → 25 shares; throttled to 0 by CB OUT. Per-position cap on NVDA is 10% (tighter than 15% standard) per watchlist note — well above the 6% target."
+  },
+  "confidence_score": 0.55,
+  "confidence_notes": "Confidence in the NO_TRADE decision itself is high (≈0.95) — all three gates are mechanical. The 0.55 reflects confidence in the underlying long thesis if all gates were clear, modestly above neutral because rank 5 is real but the boundary placement and tightest watchlist cap warrant caution.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "NO_TRADE reduces no risk and adds no exposure; the decision is APPROVED on the conservative side. If this had been a PAPER_BUY, risk-manager would have REJECTED on grounds: (a) circuit_breaker state=OUT throttles new opens to qty=0 per Path Z policy; (b) daily-bar data staleness exceeds max_data_staleness_seconds=60. Either alone is a hard reject. R/R 2.5:1 ≥ 1.5 minimum (passes); position size 5.88% of account ≤ 10% NVDA cap (passes); per-trade risk 0.59% ≤ 1.5% cap (passes). Mechanical gates fail before the strategic gates matter.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "NVDA is on watchlist.yaml with approved_for_paper_trading=true (max_position_size_pct=10); strategy large_cap_momentum_top5 is ACTIVE_PAPER_TEST; mode PAPER_TRADING permits all decision classes. NO_TRADE is recorded for prediction-review traceability and is the correct routing given the two mechanical gates. Schema-compliant. No live execution.",
+  "human_approval_required": false,
+  "final_status": "NO_TRADE",
+  "rejection_reason": "circuit_breaker_OUT AND data_staleness_breach",
+  "data_provenance": {
+    "signals_source": "data/market/2026-05-14/2036_eod.json (signals.evaluate_all at EOD; BAR_SOURCE=alpaca)",
+    "pre_market_snapshot": "data/market/2026-05-14/0630.json",
+    "quote_source": "lib.data.get_latest_quote (Alpaca IEX, 20:00:02Z 2026-05-14)",
+    "quote_at_close": 235.25,
+    "daily_bar_latest_ts": "2026-05-08T04:00:00+00:00",
+    "daily_bar_staleness_days": 6,
+    "max_data_staleness_seconds": 60,
+    "regime": "bullish_trend (medium confidence)",
+    "circuit_breaker_state": "OUT",
+    "circuit_breaker_peak_equity": 119140.25,
+    "circuit_breaker_current_equity": 100824.20,
+    "circuit_breaker_dd_pct": 15.37,
+    "throttle": 0.0
+  }
+}

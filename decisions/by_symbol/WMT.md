@@ -35,3 +35,21 @@
 - Mark vs entry $130.116 → -$221.54 (-3.70%). Stop $117.081 (6.6% headroom).
 - Decision: continue holding; no new decision file written.
 - Forward risk: April retail sales releases 2026-05-14 BMO; WMT is itself a component of the data series. Pre-market 2026-05-14 must flag the print and any WMT reaction. WMT's own earnings 2026-05-21 BMO (one week out).
+
+## 2026-05-14 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-14, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: ENTRY re-confirmed (rank 4/21 +19.43% 6m, SPY trend up).
+- Quote at pre_close (19:41Z in-market): $132.01. Post-close IEX last $137.97 (degraded; bid $124.62 / ask $137.97 — wide spread, discarded as a real mark).
+- Mark vs entry $130.116 → **+$87.12 (+1.46%)**. Stop $117.081 (11.3% headroom — recovered vs yesterday's 6.6%).
+- Decision: continue holding; no new decision file written.
+- **Earnings catalyst flag carried**: WMT Q1 FY27 BMO 2026-05-21 (5 trading days out — outside next-trading-day window today but inside the CSCO-style 1-trading-day window at pre_close-2026-05-20). Restructuring announcement 2026-05-12 (~1,000 corporate roles) was non-thesis-invalidating per news scan.
+
+**Cumulative stats (updated 2026-05-14 EOD):**
+
+- Open paper positions: 1 (qty 46 @ $130.1160)
+- Closed paper trades: 0
+- Realized PnL: $0.00
+- Unrealized PnL (mark $132.01): +$87.12 (+1.46%)
+- Win rate: n/a (no closed trades)
+- Active strategies: large_cap_momentum_top5

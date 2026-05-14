@@ -21,3 +21,10 @@
 - Quote at close $283.24 (Alpaca IEX live, 20:00:00Z). Stop $254.92, Target $354.05, nominal R/R 2.5:1.
 - Risk Manager: APPROVED on NO_TRADE (reduces no risk). Compliance: APPROVED.
 - Watch tomorrow: if either gate clears (CB peak fix lands via `prompts/proposed_updates/cb_equity_source.md` OR feed catches up), reconsider on the EOD-2026-05-14 signal.
+
+## 2026-05-14 — NO_SIGNAL (hold-zone), no decision written
+
+- Routine: end_of_day_2026-05-14, mode PAPER_TRADING, cb_state=OUT, throttle=0.0.
+- Signal: NO_SIGNAL — rank 6/21 (+18.07% 6m), inside top-5+2 hold-zone buffer. AMZN slipped one rank (5→6) vs 2026-05-13; NVDA was promoted from rank 7→5 in the opposite direction.
+- Decision: continue watching; no decision file written (NO_SIGNAL has no asymmetric thesis to record).
+- Status unchanged: 0 positions; signal valid but in hold-zone, not in ENTRY cohort. If AMZN re-enters top-5 on the next routine AND the CB + staleness gates have cleared, it becomes a fresh entry candidate.

@@ -39,3 +39,20 @@
 - Quote at close $430.55. Mark vs entry $430.7861 → -$8.03 (-0.05%). Stop $387.63 (10.0% headroom).
 - Decision: continue holding; no new decision file written (held-position re-confirm; no fill, no close).
 - Cumulative: still 1 open position, qty 34 @ $430.7861. Day-1 friction artifact carries forward.
+
+## 2026-05-14 — EOD held (re-confirm ENTRY, no trade)
+
+- Routine: end_of_day_2026-05-14, mode PAPER_TRADING, cb_state=OUT (no transition; 7th consecutive routine on inflated peak), throttle=0.0.
+- Signal: ENTRY re-confirmed for both strategies (dual_momentum_taa top-1: 12m +39.53% > SPY +30.88% > IEF +0.54%; gold_permanent_overlay permanent policy).
+- Quote at pre_close (19:41Z in-market): $428.01. Post-close IEX last $427.56 (degraded; bid $427.10 / ask $427.56, but quote_ts 20:01Z — kept as reference only).
+- Mark vs entry $430.7861 → **-$94.39 (-0.64%)**. Stop $387.63 (9.4% headroom).
+- Decision: continue holding; no new decision file written (held-position re-confirm; no fill, no close).
+
+**Cumulative stats (updated 2026-05-14 EOD):**
+
+- Open paper positions: 1 (qty 34 @ $430.7861)
+- Closed paper trades: 0
+- Realized PnL: $0.00
+- Unrealized PnL (mark $428.01): -$94.39 (-0.64%)
+- Win rate: n/a (no closed trades)
+- Active strategies: dual_momentum_taa (primary), gold_permanent_overlay (subsumed)
