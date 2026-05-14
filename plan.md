@@ -33,7 +33,7 @@ All three coded deterministically in `lib/signals.py` and unit-tested in `tests/
 - Drawdown target (≤ 15%) is **missed by 9+ percentage points** in every variant.
 - Strategy A (TAA) standalone *did* improve materially with IEF (+219% vs +186% TLT) — that swap is committed.
 - Allocation tuning and bond substitution together moved DD by < 1 pp. **The ~24% DD appears structural to the strategy set.**
-- Window starts 2013 (no 2008 stress test) — real recession DD could be 30–35%.
+- Window starts 2013 (2008 stress-test attempted 2026-05-13; see below — align_bars constraint with META prevented reaching 2008; COVID 2020 is best available crisis analog: 12.03% DD vs SPY -34%).
 
 ### TLT → IEF swap (committed today)
 `lib/signals.py` `TAA_RISK_ASSETS = ["SPY", "IEF", "GLD"]`. `config/watchlist.yaml` now has IEF as paper-approved; TLT remains on watchlist but `approved_for_paper_trading: false`. See note in TLT entry referencing 2022 rate-hike DD contribution.
@@ -71,7 +71,7 @@ Path Z implementation: `scripts/run_multi_strategy_backtest.py --circuit-breaker
 
 Final equity on $100k: $392,465. **15 throttle events** over 13 years — clean cadence, no whipsaws. Sharpe (1.14) actually beats the no-breaker baseline (1.10) — same edge, smoother ride.
 
-**Real-world haircut estimate:** survivor bias on Strategy B ~2–4 pp/yr; circuit-breaker friction ~0.1–0.15 pp/yr; absence of 2008 from window makes recession DD untested. Realistic forward expectation: **9–10% CAGR with ~15–18% max DD**, right in the target band.
+**Real-world haircut estimate:** survivor bias on Strategy B ~2–4 pp/yr; circuit-breaker friction ~0.1–0.15 pp/yr; 2008 crisis not reachable due to align_bars+META constraint (see 2008 backtest section below). Best available crisis analog: COVID 2020 (portfolio DD 12.03% vs SPY -34%). Realistic forward expectation: **9–10% CAGR with ~15–18% max DD**, right in the target band.
 
 See `reports/learning/pivot_validation_2026-05-10.md` for the full Path X/Y/Z comparison and `backtests/multi_strategy_portfolio/2013-05-24_to_2026-05-08_path_z_asymmetric_5_8.md` for the chosen-variant report.
 
@@ -212,13 +212,36 @@ External-review concern #1 (statistical robustness — walk-forward, parameter s
 
 **Tests:** 138 passing (was 99 before the plan).
 
+### 2008-inclusive backtest — landed 2026-05-13
+
+**Approach:** Added `--cash-proxy BIL` flag to `scripts/run_multi_strategy_backtest.py` (Plan #3 Task 2), wrote `scripts/run_2008_backtest.py` as a subprocess driver (Task 3), and applied `filter_bars_by_listing()` from `lib/historical_universe` to all bars before alignment (Task 4). The time-aware filter drops synthesized pre-listing bars for META/TSLA/V so Strategy B's top-N only considers symbols that actually existed.
+
+**Finding — align_bars constraint:** The `align_bars()` function intersects dates across ALL symbols including META (listed 2012-05-18). Even with the listing filter, META's first bar is 2012-05-18, pushing the effective window to 2013-05-22 after the 12-month momentum warmup. **The 2008 financial crisis (Oct 2007 → Mar 2009) was not reached.**
+
+**Headline metrics over 2013-05-22 → 2026-05-08 (12.9y, BIL cash proxy):**
+- CAGR: +10.65%
+- Max drawdown: **12.68%** (worst event: 2024-07-24 → 2024-08-05)
+- Sharpe: 1.10
+- CB throttle events: 13
+
+**Crisis-period DD (2008-09 → 2009-03):** N/A — outside effective window.
+
+**Best available crisis analog:** COVID 2020 crash — SPY fell -34% peak-to-trough; portfolio DD was 12.03% (circuit-breaker throttled FULL → OUT on 2020-03-03). Drawdown reduction vs buy-and-hold: 64%.
+
+**15% DD ceiling verdict:** PASS for the 2013-2026 window (12.68% < 15%). The 2008 crisis itself remains untested at the full-portfolio level. A Strategy-A-only run from 2007 would isolate the trend-following component's 2008 behavior (future work).
+
+**Reports:**
+- `backtests/multi_strategy_portfolio/2013-05-22_to_2026-05-08_2008_inclusive.md`
+- `reports/learning/2008_stress_test_2026-05-14.md`
+- Plan: `docs/superpowers/plans/2026-05-12-2008-inclusive-backtest.md`
+
 ### Still open
 
 - [ ] Operator action: set up the three new intraday monitoring routines on Claude Code web (same template as pre_market / end_of_day; cron per `config/routine_schedule.yaml`; same `calm-turtle` environment).
 - [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
 - [ ] Per-symbol history compression: when `decisions/by_symbol/<SYM>.md` timeline exceeds 50 rows, Performance Review collapses older rows into a "Summary before <date>" header block. Read load stabilizes.
 - [ ] `logs/routine_runs/` auto-archive to `logs/routine_runs/archive/<year>/<month>/` after 30 days.
-- [ ] Backtest with a 2008-inclusive window when feasible (current alignment starts 2013).
+- [ ] Strategy A (TAA) standalone 2008 stress test: run with --start 2007-01-01 on the SPY/IEF/GLD/BIL-only symbol set (no Strategy B alignment constraint) to measure 2008-crisis DD for the trend-following component specifically.
 - [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
 - [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; consider preferring `.venv/bin/python` in the hook for portability.
 
