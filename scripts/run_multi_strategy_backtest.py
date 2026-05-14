@@ -30,6 +30,7 @@ CACHE_DIR = REPO_ROOT / "backtests" / "_yfinance_cache"
 
 from lib import backtest, config, portfolio_risk, signals  # noqa: E402
 from lib.fills import FillModel, simulated_fill_price  # noqa: E402
+from lib.historical_universe import filter_bars_by_listing  # noqa: E402
 
 
 DEFAULT_ALLOCATION = {
@@ -388,6 +389,12 @@ def run_backtest(args) -> dict:
             print(f"  {sym}: FAILED {exc}")
             continue
         time.sleep(0.05)
+
+    # Drop any bars dated before a symbol's listing date.
+    # yfinance occasionally returns synthesized pre-listing rows (zeros / NaN).
+    # This is a no-op for symbols not in MEGACAP_LISTING_DATES, and a defensive
+    # filter for META/TSLA/V in long-window (pre-2012) backtests.
+    bars = filter_bars_by_listing(bars)
 
     # Align all symbols to the window.
     aligned = align_bars(bars, start_date=args.start, end_date=args.end)
