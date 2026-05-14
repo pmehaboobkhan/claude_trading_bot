@@ -8,7 +8,7 @@
     "schema_version": { "type": "integer", "const": 1 },
     "mode": {
       "type": "string",
-      "enum": ["RESEARCH_ONLY", "PAPER_TRADING", "LIVE_PROPOSALS", "LIVE_EXECUTION", "HALTED"]
+      "enum": ["RESEARCH_ONLY", "PAPER_TRADING", "SAFE_MODE", "LIVE_PROPOSALS", "LIVE_EXECUTION", "HALTED"]
     },
     "mode_set_at": { "type": "string", "format": "date-time" },
     "mode_set_by": { "type": "string", "minLength": 1 },

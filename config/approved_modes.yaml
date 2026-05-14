@@ -7,6 +7,8 @@ mode_set_reason: "v1 infrastructure complete (signals + circuit-breaker + paper 
 # Allowed transitions (enforced by hook #11):
 #   RESEARCH_ONLY  -> PAPER_TRADING  (human PR)
 #   PAPER_TRADING  -> RESEARCH_ONLY  (human PR or /halt-trading flips through HALTED first)
+#   PAPER_TRADING  -> SAFE_MODE      (via /enter-safe-mode slash command; writes paired logs/risk_events/ entry)
+#   SAFE_MODE      -> PAPER_TRADING  (human PR only — explicit "safe to resume" decision)
 #   PAPER_TRADING  -> LIVE_PROPOSALS (human PR; Phase 6+)
 #   LIVE_PROPOSALS -> LIVE_EXECUTION (human PR; Phase 8+; signed risk profile required)
 #   any            -> HALTED         (via /halt-trading slash command, which writes a paired logs/risk_events/ entry)
