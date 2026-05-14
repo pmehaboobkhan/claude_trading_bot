@@ -155,8 +155,18 @@ Tracked against the absolute targets, not against SPY:
 - Any individual strategy's drawdown breaches 25% on its allocated capital.
 
 **Live-trading unlock criteria (not active in v1):**
+
+*Floor criteria (existing):*
 - 90+ trading days of paper operation.
 - 30+ closed paper trades across all strategies.
 - Portfolio Sharpe ratio ≥ 0.8 on paper data.
 - Max drawdown ≤ 12% on paper data.
 - Explicit human PR + signed update to `docs/risk_profile.md`.
+
+*Regime-diversity criteria (added 2026-05-13):* the system must have *survived* at least one stress event in paper, not just operated in benign conditions. Going live on the basis of a friendly market window is the canonical retail-quant mistake.
+- At least one circuit-breaker throttle event observed (FULL→HALF or HALF→OUT). Proves the breaker actually engages, not just that thresholds were never tested.
+- At least one SPY 10-month-SMA trend flip during the window (above→below or below→above). Proves the trend filter actually changed state.
+- At least one daily VIX close ≥ 25 observed. Proves the system has seen elevated (non-benign) volatility.
+- At least 4 distinct calendar months of operation. Any one month, however good, is uninformative.
+
+These criteria are encoded in `config/risk_limits.yaml > gates.regime_diversity_gates` and evaluated by `lib.live_trading_gate.evaluate_gates()` during the monthly review routine. The verdict is a recommendation input only — human PR approval remains required, and `mode == LIVE_EXECUTION` still requires an explicit human-approved config change.
