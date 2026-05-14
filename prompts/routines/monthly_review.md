@@ -205,3 +205,37 @@ signal to compress per-symbol histories or rotate memory files. Until then,
 we trust the system.
 
 The hook-written `_start.md` / `_end.md` markers are separate and unchanged.
+
+## SAFE_MODE handling (added 2026-05-14 — Plan #4)
+
+Before any step that writes to `memory/` (except `memory/daily_snapshots/`),
+to `prompts/proposed_updates/`, or that dispatches the `self_learning` agent:
+
+```python
+from lib import config, operating_mode
+mode = config.current_mode()
+if mode == "SAFE_MODE":
+    # Skip this step entirely. The hook safe_mode_writes.sh would block
+    # the file write anyway, but the routine should not attempt it —
+    # it wastes tokens and pollutes the audit trail.
+    pass
+```
+
+Specific steps to guard in this routine:
+- Any write to `memory/symbol_profiles/`, `memory/agent_performance/`,
+  `memory/prediction_reviews/`, `memory/strategy_lessons/`,
+  `memory/market_regimes/` (except `current_regime.md` which is operational).
+- Any dispatch of the `self_learning` subagent.
+- Any write to `prompts/proposed_updates/`.
+
+Snapshots to `memory/daily_snapshots/` are operational, not learning, and
+remain allowed in SAFE_MODE.
+
+When `mode == SAFE_MODE`, the Telegram notification should append:
+```
+• <b>Mode:</b> <code>SAFE_MODE</code> (learning suppressed)
+```
+
+The routine_audit appendix MUST record `mode: SAFE_MODE` and a count of
+skipped learning steps so the audit trail clearly shows learning was
+intentionally suppressed.
