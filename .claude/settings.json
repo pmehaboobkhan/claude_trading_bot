@@ -10,7 +10,8 @@
           { "type": "command", "command": ".claude/hooks/block_prompt_overwrites.sh" },
           { "type": "command", "command": ".claude/hooks/halt_audit.sh" },
           { "type": "command", "command": ".claude/hooks/append_only.sh" },
-          { "type": "command", "command": ".claude/hooks/require_strategy_tests.sh" }
+          { "type": "command", "command": ".claude/hooks/require_strategy_tests.sh" },
+          { "type": "command", "command": ".claude/hooks/safe_mode_writes.sh" }
         ]
       },
       {
