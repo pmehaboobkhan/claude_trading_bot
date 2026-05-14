@@ -43,20 +43,20 @@ GitHub `/blob/main/<path>` URLs do not work reliably for our users:
 **Solution: send reports as Telegram document attachments.** No GitHub
 dependency. The user reads the file inline in Telegram on any device.
 
-### Step A — text message via `lib.notify.send`
+### Step A — text message via `lib.notify.send_html`
 
-Bulleted format with bold labels. `lib.notify.send()` already uses
-`parse_mode: "Markdown"` so `*bold*` and `•` render natively.
+Bulleted format with bold labels. `lib.notify.send_html()` uses
+`parse_mode: "HTML"` so `<b>bold</b>`, `<code>code</code>`, and `•` render natively.
 
 **Required bullets for `Self-learning review` (in order):**
 
-• *Period:* <start> → <end> (<N> trading days)
-• *Observations written:* <N>
-• *Top pattern:* <one-line summary> (N=<X>, <low/medium/high> confidence)
-• *Proposals drafted:* <N> (v1 observations-only — should be 0)
-• *Context:* ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
-• *Commit:* <short SHA> (auto-merged to main)
-• *Artifacts attached below:* <N> file(s)
+• <b>Period:</b> <start> → <end> (<N> trading days)
+• <b>Observations written:</b> <N>
+• <b>Top pattern:</b> <one-line summary> (N=<X>, <low/medium/high> confidence)
+• <b>Proposals drafted:</b> <N> (v1 observations-only — should be 0)
+• <b>Context:</b> ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
+• <b>Commit:</b> <code><short SHA></code> (auto-merged to main)
+• <b>Artifacts attached below:</b> <N> file(s)
 
 Rules:
 - Never mention the feature branch name.
@@ -64,14 +64,14 @@ Rules:
 - Each bullet under one line on a phone (~50–60 chars).
 - Total text under 1500 chars.
 
-### Step B — file attachments via `lib.notify.send_documents`
+### Step B — file attachments via `lib.notify.send_documents_html`
 
 After the text message succeeds, attach the artifacts produced this run:
 
 ```bash
 python3 - <<'PYNOTIFY'
 from lib import notify
-delivered = notify.send_documents([
+delivered = notify.send_documents_html([
     "reports/learning/weekly_learning_review_<YYYY-MM-DD>.md"
 ])
 print(f"docs delivered: {delivered}")
@@ -85,15 +85,15 @@ they're tiny; markdown reports render best.
 ### Example for `Self-learning review`
 
 ```
-*[Calm Turtle] Self-learning review 2026-05-17*
+<b>[Calm Turtle] Self-learning review 2026-05-17</b>
 
-• *Period:* 2026-05-12 → 2026-05-16 (5 trading days)
-• *Observations written:* 4
-• *Top pattern:* large_cap_momentum_top5 entries on FOMC weeks underperform (N=2, low confidence)
-• *Proposals drafted:* 0 (v1 observations-only)
-• *Context:* ~24 KB (cap 200 KB)
-• *Commit:* l1m2n3o (auto-merged to main)
-• *Artifacts attached below:* 1 file
+• <b>Period:</b> 2026-05-12 → 2026-05-16 (5 trading days)
+• <b>Observations written:</b> 4
+• <b>Top pattern:</b> large_cap_momentum_top5 entries on FOMC weeks underperform (N=2, low confidence)
+• <b>Proposals drafted:</b> 0 (v1 observations-only)
+• <b>Context:</b> ~24 KB (cap 200 KB)
+• <b>Commit:</b> <code>l1m2n3o</code> (auto-merged to main)
+• <b>Artifacts attached below:</b> 1 file
 ```
 
 The example shows the TEXT MESSAGE only. The attachments appear in the chat

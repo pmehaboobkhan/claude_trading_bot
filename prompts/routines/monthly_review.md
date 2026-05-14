@@ -107,22 +107,22 @@ GitHub `/blob/main/<path>` URLs do not work reliably for our users:
 **Solution: send reports as Telegram document attachments.** No GitHub
 dependency. The user reads the file inline in Telegram on any device.
 
-### Step A — text message via `lib.notify.send`
+### Step A — text message via `lib.notify.send_html`
 
-Bulleted format with bold labels. `lib.notify.send()` already uses
-`parse_mode: "Markdown"` so `*bold*` and `•` render natively.
+Bulleted format with bold labels. `lib.notify.send_html()` uses
+`parse_mode: "HTML"` so `<b>bold</b>`, `<code>code</code>`, and `•` render natively.
 
 **Required bullets for `Monthly review` (in order):**
 
-• *Month return:* <signed %>
-• *Annualized run-rate:* ~<X.X>% (N=<X> days)
-• *Max DD MTD:* <X.X>%
-• *Sharpe (MTD):* <X.XX>
-• *Recommendation:* <STAY_PAPER | PROPOSE_HUMAN_APPROVED_LIVE | HALT_AND_REVIEW>
-• *Gate:* <PASS|FAIL> (failing: <comma-separated gate names or "—">)
-• *Context:* ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
-• *Commit:* <short SHA> (auto-merged to main)
-• *Artifacts attached below:* <N> file(s)
+• <b>Month return:</b> <signed %>
+• <b>Annualized run-rate:</b> ~<X.X>% (N=<X> days)
+• <b>Max DD MTD:</b> <X.X>%
+• <b>Sharpe (MTD):</b> <X.XX>
+• <b>Recommendation:</b> <code>STAY_PAPER</code> | <code>PROPOSE_HUMAN_APPROVED_LIVE</code> | <code>HALT_AND_REVIEW</code>
+• <b>Gate:</b> <code>PASS</code> | <code>FAIL</code> (failing: <comma-separated gate names or "—">)
+• <b>Context:</b> ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
+• <b>Commit:</b> <code><short SHA></code> (auto-merged to main)
+• <b>Artifacts attached below:</b> <N> file(s)
 
 Rules:
 - Never mention the feature branch name.
@@ -130,7 +130,7 @@ Rules:
 - Each bullet under one line on a phone (~50–60 chars).
 - Total text under 1500 chars.
 
-### Step B — file attachments via `lib.notify.send_documents`
+### Step B — file attachments via `lib.notify.send_documents_html`
 
 After the text message succeeds, attach the artifacts produced this run:
 
@@ -143,7 +143,7 @@ paths = ["journals/monthly/<YYYY-MM>.md"]
 # passed/failed before approving the PR.
 if recommendation == "PROPOSE_HUMAN_APPROVED_LIVE":
     paths.append("reports/learning/monthly_review_<YYYY-MM>_gate_verdict.json")
-delivered = notify.send_documents(paths)
+delivered = notify.send_documents_html(paths)
 print(f"docs delivered: {delivered}")
 PYNOTIFY
 ```
@@ -155,17 +155,17 @@ they're tiny; markdown reports render best.
 ### Example for `Monthly review`
 
 ```
-*[Calm Turtle] Monthly review 2026-05*
+<b>[Calm Turtle] Monthly review 2026-05</b>
 
-• *Month return:* +1.92%
-• *Annualized run-rate:* ~23.0% (N=11 days)
-• *Max DD MTD:* 2.1%
-• *Sharpe (MTD):* 1.18
-• *Recommendation:* STAY_PAPER
-• *Gate:* FAIL (failing: cb_throttle_event, vix_high_observed, distinct_calendar_months)
-• *Context:* ~46 KB (cap 200 KB)
-• *Commit:* t7u8v9w (auto-merged to main)
-• *Artifacts attached below:* 1 file
+• <b>Month return:</b> +1.92%
+• <b>Annualized run-rate:</b> ~23.0% (N=11 days)
+• <b>Max DD MTD:</b> 2.1%
+• <b>Sharpe (MTD):</b> 1.18
+• <b>Recommendation:</b> <code>STAY_PAPER</code>
+• <b>Gate:</b> <code>FAIL</code> (failing: cb_throttle_event, vix_high_observed, distinct_calendar_months)
+• <b>Context:</b> ~46 KB (cap 200 KB)
+• <b>Commit:</b> <code>t7u8v9w</code> (auto-merged to main)
+• <b>Artifacts attached below:</b> 1 file
 ```
 
 The example shows the TEXT MESSAGE only. The attachments appear in the chat

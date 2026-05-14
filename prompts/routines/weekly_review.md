@@ -45,21 +45,21 @@ GitHub `/blob/main/<path>` URLs do not work reliably for our users:
 **Solution: send reports as Telegram document attachments.** No GitHub
 dependency. The user reads the file inline in Telegram on any device.
 
-### Step A — text message via `lib.notify.send`
+### Step A — text message via `lib.notify.send_html`
 
-Bulleted format with bold labels. `lib.notify.send()` already uses
-`parse_mode: "Markdown"` so `*bold*` and `•` render natively.
+Bulleted format with bold labels. `lib.notify.send_html()` uses
+`parse_mode: "HTML"` so `<b>bold</b>`, `<code>code</code>`, and `•` render natively.
 
 **Required bullets for `Weekly review` (in order):**
 
-• *Period return:* <signed %>
-• *Sharpe:* <X.XX> (5d)
-• *Win rate:* <X>% (<W>W / <L>L)
-• *Max DD this week:* <X.X>%
-• *Recommendation:* <STAY_PAPER | ...>
-• *Context:* ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
-• *Commit:* <short SHA> (auto-merged to main)
-• *Artifacts attached below:* <N> file(s)
+• <b>Period return:</b> <signed %>
+• <b>Sharpe:</b> <X.XX> (5d)
+• <b>Win rate:</b> <X>% (<W>W / <L>L)
+• <b>Max DD this week:</b> <X.X>%
+• <b>Recommendation:</b> <code>STAY_PAPER</code> | …
+• <b>Context:</b> ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
+• <b>Commit:</b> <code><short SHA></code> (auto-merged to main)
+• <b>Artifacts attached below:</b> <N> file(s)
 
 Rules:
 - Never mention the feature branch name.
@@ -67,14 +67,14 @@ Rules:
 - Each bullet under one line on a phone (~50–60 chars).
 - Total text under 1500 chars.
 
-### Step B — file attachments via `lib.notify.send_documents`
+### Step B — file attachments via `lib.notify.send_documents_html`
 
 After the text message succeeds, attach the artifacts produced this run:
 
 ```bash
 python3 - <<'PYNOTIFY'
 from lib import notify
-delivered = notify.send_documents([
+delivered = notify.send_documents_html([
     "journals/weekly/<YYYY-WW>.md"
 ])
 print(f"docs delivered: {delivered}")
@@ -88,16 +88,16 @@ they're tiny; markdown reports render best.
 ### Example for `Weekly review`
 
 ```
-*[Calm Turtle] Weekly review WK-19 2026*
+<b>[Calm Turtle] Weekly review WK-19 2026</b>
 
-• *Period return:* +1.84%
-• *Sharpe:* 1.21 (5d)
-• *Win rate:* 67% (8W / 4L)
-• *Max DD this week:* 2.1%
-• *Recommendation:* STAY_PAPER
-• *Context:* ~28 KB (cap 200 KB)
-• *Commit:* p4q5r6s (auto-merged to main)
-• *Artifacts attached below:* 1 file
+• <b>Period return:</b> +1.84%
+• <b>Sharpe:</b> 1.21 (5d)
+• <b>Win rate:</b> 67% (8W / 4L)
+• <b>Max DD this week:</b> 2.1%
+• <b>Recommendation:</b> <code>STAY_PAPER</code>
+• <b>Context:</b> ~28 KB (cap 200 KB)
+• <b>Commit:</b> <code>p4q5r6s</code> (auto-merged to main)
+• <b>Artifacts attached below:</b> 1 file
 ```
 
 The example shows the TEXT MESSAGE only. The attachments appear in the chat

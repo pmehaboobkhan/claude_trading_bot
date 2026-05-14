@@ -175,21 +175,21 @@ GitHub `/blob/main/<path>` URLs do not work reliably for our users:
 **Solution: send reports as Telegram document attachments.** No GitHub
 dependency. The user reads the file inline in Telegram on any device.
 
-### Step A — text message via `lib.notify.send`
+### Step A — text message via `lib.notify.send_html`
 
-Bulleted format with bold labels. `lib.notify.send()` already uses
-`parse_mode: "Markdown"` so `*bold*` and `•` render natively.
+Bulleted format with bold labels. `lib.notify.send_html()` uses
+`parse_mode: "HTML"` so `<b>bold</b>`, `<code>code</code>`, and `•` render natively.
 
 **Required bullets for `End of day` (in order):**
 
-• *PnL:* <signed $> (<signed %>)
-• *Trades:* <X> opens, <Y> closes
-• *Open positions:* <N> (<top 3-4 symbols>)
-• *Circuit-breaker:* <FULL/HALF/OUT> (DD <X.X>%)
-• *Mode:* <mode>
-• *Context:* ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
-• *Commit:* <short SHA> (auto-merged to main)
-• *Artifacts attached below:* <N> file(s)
+• <b>PnL:</b> <signed $> (<signed %>)
+• <b>Trades:</b> <X> opens, <Y> closes
+• <b>Open positions:</b> <N> (<top 3-4 symbols>)
+• <b>Circuit-breaker:</b> <code>FULL</code> | <code>HALF</code> | <code>OUT</code> (DD <X.X>%)
+• <b>Mode:</b> <mode>
+• <b>Context:</b> ~<N> KB (cap 200 KB)              ← from audit step's approximate_input_kb
+• <b>Commit:</b> <code><short SHA></code> (auto-merged to main)
+• <b>Artifacts attached below:</b> <N> file(s)
 
 Rules:
 - Never mention the feature branch name.
@@ -197,14 +197,14 @@ Rules:
 - Each bullet under one line on a phone (~50–60 chars).
 - Total text under 1500 chars.
 
-### Step B — file attachments via `lib.notify.send_documents`
+### Step B — file attachments via `lib.notify.send_documents_html`
 
 After the text message succeeds, attach the artifacts produced this run:
 
 ```bash
 python3 - <<'PYNOTIFY'
 from lib import notify
-delivered = notify.send_documents([
+delivered = notify.send_documents_html([
     "journals/daily/<YYYY-MM-DD>.md",
     "memory/daily_snapshots/<YYYY-MM-DD>.md",
     # add: any decisions/<YYYY-MM-DD>/<HHMM>_<SYM>.json the user would want to skim
@@ -220,16 +220,16 @@ they're tiny; markdown reports render best.
 ### Example for `End of day`
 
 ```
-*[Calm Turtle] EOD 2026-05-13*
+<b>[Calm Turtle] EOD 2026-05-13</b>
 
-• *PnL:* +$184.20 (+0.18%)
-• *Trades:* 3 opens, 0 closes
-• *Open positions:* 4 (GOOGL, JNJ, GLD, WMT)
-• *Circuit-breaker:* FULL (DD 0.4%)
-• *Mode:* PAPER_TRADING
-• *Context:* ~32 KB (cap 200 KB)
-• *Commit:* a1b2c3d (auto-merged to main)
-• *Artifacts attached below:* 2 files
+• <b>PnL:</b> +$184.20 (+0.18%)
+• <b>Trades:</b> 3 opens, 0 closes
+• <b>Open positions:</b> 4 (<code>GOOGL</code>, <code>JNJ</code>, <code>GLD</code>, <code>WMT</code>)
+• <b>Circuit-breaker:</b> <code>FULL</code> (DD 0.4%)
+• <b>Mode:</b> <code>PAPER_TRADING</code>
+• <b>Context:</b> ~32 KB (cap 200 KB)
+• <b>Commit:</b> <code>a1b2c3d</code> (auto-merged to main)
+• <b>Artifacts attached below:</b> 2 files
 ```
 
 The example shows the TEXT MESSAGE only. The attachments appear in the chat
