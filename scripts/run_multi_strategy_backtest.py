@@ -29,8 +29,10 @@ sys.path.insert(0, str(REPO_ROOT))
 CACHE_DIR = REPO_ROOT / "backtests" / "_yfinance_cache"
 
 from lib import backtest, config, portfolio_risk, signals  # noqa: E402
+from lib.backtest import BacktestResult, Position  # noqa: E402
 from lib.fills import FillModel, simulated_fill_price  # noqa: E402
 from lib.historical_universe import filter_bars_by_listing  # noqa: E402
+from lib import historical_membership  # noqa: E402
 
 
 DEFAULT_ALLOCATION = {
@@ -299,6 +301,188 @@ def _combine_equity_curves(curves: list[list[tuple[str, float]]]) -> list[tuple[
 
 
 # ---------------------------------------------------------------------------
+# Strategy B as-of universe runner (survivor-bias stress test)
+# ---------------------------------------------------------------------------
+
+# Symbols that must NOT appear in Strategy B's universe (they belong to TAA / gold overlay).
+_MACRO_ETFS: frozenset[str] = frozenset(["SPY", "IEF", "GLD", "SHV", "TLT", "SHY", "BIL"])
+
+
+def run_strategy_b_as_of(
+    all_bars: dict[str, list[dict]],
+    *,
+    start_date: str,
+    end_date: str,
+    initial_capital: float,
+    max_position_size_pct: float = 20.0,
+    strategy_rules: dict,
+) -> BacktestResult:
+    """Run large_cap_momentum_top5 with a year-by-year point-in-time universe.
+
+    At each date, the candidate universe is restricted to the symbols that were
+    in the S&P 100 (or top-30 by market cap) at the start of *that year*, per
+    data/historical/sp100_as_of.json.  SPY bars are still available for the
+    trend filter.  All other logic (momentum window, top-N selection, fill
+    model, position sizing) is identical to the standard backtest.
+
+    Returns a BacktestResult so the rest of run_backtest() can consume it
+    without knowing which path was taken.
+    """
+    fm = FillModel()
+    cash = initial_capital
+    positions: dict[str, Position] = {}
+    trades: list[dict] = []
+    equity_curve: list[tuple[str, float]] = []
+
+    if "SPY" not in all_bars:
+        raise ValueError("SPY bars required for Strategy B trend filter")
+
+    # Build the date timeline from SPY.
+    dates = [b["ts"][:10] for b in all_bars["SPY"]]
+    start_idx = next((i for i, d in enumerate(dates) if d >= start_date), None)
+    end_idx = next((i for i, d in enumerate(dates) if d > end_date), len(dates))
+    if start_idx is None:
+        raise ValueError(f"no SPY bars at or after start_date={start_date}")
+    warmup = 200
+    start_idx = max(start_idx, warmup)
+
+    # Cache today's strategy_rules with Strategy B active.
+    rules_b_active = strategy_rules
+
+    for i in range(start_idx, end_idx):
+        date = dates[i]
+        # Year-appropriate universe from the as-of table.
+        as_of_syms = set(historical_membership.members_as_of(date))
+
+        # Build the per-step bars slice, restricted to as-of symbols plus SPY.
+        # This is the key difference vs the standard run: symbols not in the as-of
+        # set are invisible to the momentum ranker at this date.
+        allowed = as_of_syms | {"SPY"}
+        slice_by_symbol: dict[str, list[dict]] = {}
+        for sym, sym_bars in all_bars.items():
+            if sym not in allowed:
+                continue
+            if i < len(sym_bars):
+                slice_by_symbol[sym] = sym_bars[: i + 1]
+
+        # Also include any currently-held position even if it fell off the as-of
+        # list this year — we need its bars for mark-to-market and EXIT signals.
+        for held_sym in positions:
+            if held_sym not in slice_by_symbol and held_sym in all_bars:
+                sym_bars = all_bars[held_sym]
+                if i < len(sym_bars):
+                    slice_by_symbol[held_sym] = sym_bars[: i + 1]
+
+        if "SPY" not in slice_by_symbol:
+            continue
+
+        regime = signals.detect_regime(slice_by_symbol["SPY"], None)
+        # watchlist_symbols for evaluate_large_cap_momentum_top5: pass as-of symbols
+        # so its universe filter sees only the year-appropriate names.
+        as_of_watchlist = [s for s in as_of_syms if s in slice_by_symbol]
+        strat_signals = signals.evaluate_large_cap_momentum_top5(
+            slice_by_symbol, as_of_watchlist, regime, rules_b_active,
+        )
+        my_signals = [s for s in strat_signals
+                      if s.strategy == "large_cap_momentum_top5"]
+
+        # EXITs first (free capital).
+        for sig in my_signals:
+            if sig.action == "EXIT" and sig.symbol in positions:
+                p = positions.pop(sig.symbol)
+                bars_for_sym = slice_by_symbol.get(sig.symbol, [])
+                if not bars_for_sym:
+                    # Symbol no longer has data (bankruptcy / delisting): fill at 0.
+                    fill_price = 0.0
+                else:
+                    fill_price = simulated_fill_price(
+                        side="CLOSE", quote_price=float(bars_for_sym[-1]["close"]), model=fm
+                    )
+                proceeds = p.quantity * fill_price
+                cash += proceeds
+                trades.append({
+                    "date": date, "symbol": sig.symbol, "side": "EXIT",
+                    "quantity": p.quantity, "price": fill_price,
+                    "pnl": (fill_price - p.entry_price) * p.quantity,
+                    "rationale": sig.rationale,
+                })
+
+        # Force-EXIT any held position whose symbol is no longer in the as-of
+        # list AND has no bars at this date (effectively delisted).
+        for held_sym in list(positions.keys()):
+            if held_sym not in slice_by_symbol:
+                p = positions.pop(held_sym)
+                cash += 0  # treat as total loss (no data = delisted at ~$0)
+                trades.append({
+                    "date": date, "symbol": held_sym, "side": "EXIT",
+                    "quantity": p.quantity, "price": 0.0,
+                    "pnl": -p.entry_price * p.quantity,
+                    "rationale": "delisted / no bars: forced close at $0",
+                })
+
+        # ENTRYs.
+        for sig in my_signals:
+            if sig.action == "ENTRY" and sig.symbol not in positions and sig.symbol in slice_by_symbol:
+                bars_for_sym = slice_by_symbol[sig.symbol]
+                quote = float(bars_for_sym[-1]["close"])
+                fill_price = simulated_fill_price(side="BUY", quote_price=quote, model=fm)
+                equity_now = cash + sum(
+                    pp.quantity * float(slice_by_symbol[s][-1]["close"])
+                    for s, pp in positions.items()
+                    if s in slice_by_symbol
+                )
+                budget = equity_now * (max_position_size_pct / 100.0)
+                qty = math.floor(budget / fill_price)
+                if qty <= 0 or qty * fill_price > cash:
+                    continue
+                cash -= qty * fill_price
+                positions[sig.symbol] = Position(
+                    symbol=sig.symbol, quantity=qty, entry_price=fill_price, entry_date=date,
+                )
+                trades.append({
+                    "date": date, "symbol": sig.symbol, "side": "ENTRY",
+                    "quantity": qty, "price": fill_price, "pnl": 0.0,
+                    "rationale": sig.rationale,
+                })
+
+        # Mark-to-market.
+        equity = cash + sum(
+            pp.quantity * float(slice_by_symbol[s][-1]["close"])
+            for s, pp in positions.items()
+            if s in slice_by_symbol
+        )
+        equity_curve.append((date, equity))
+
+    # Close any still-open positions at end-of-backtest.
+    final_date = dates[end_idx - 1]
+    for sym, p in list(positions.items()):
+        sym_bars = all_bars.get(sym, [])
+        if sym_bars and end_idx <= len(sym_bars):
+            quote = float(sym_bars[end_idx - 1]["close"])
+            fill_price = simulated_fill_price(side="CLOSE", quote_price=quote, model=fm)
+        else:
+            fill_price = 0.0
+        cash += p.quantity * fill_price
+        trades.append({
+            "date": final_date, "symbol": sym, "side": "EXIT",
+            "quantity": p.quantity, "price": fill_price,
+            "pnl": (fill_price - p.entry_price) * p.quantity,
+            "rationale": "end-of-backtest forced close",
+        })
+        positions.pop(sym)
+
+    return BacktestResult(
+        strategy="large_cap_momentum_top5",
+        start_date=start_date,
+        end_date=end_date,
+        initial_capital=initial_capital,
+        final_equity=cash,
+        trades=trades,
+        equity_curve=equity_curve,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Core backtest logic (callable by sweep scripts)
 # ---------------------------------------------------------------------------
 
@@ -477,18 +661,50 @@ def run_backtest(args) -> dict:
 
     # --- Strategy B: large_cap_momentum_top5 ---
     cap_b = deployed_capital * ALLOCATION["large_cap_momentum_top5"]
-    print(f"\n[strategy B] large_cap_momentum_top5 ${cap_b:,.0f}...")
+    universe_mode = getattr(args, "strategy_b_universe_mode", "modern")
+    print(f"\n[strategy B] large_cap_momentum_top5 ${cap_b:,.0f} (universe={universe_mode})...")
     t0 = time.time()
-    result_b = backtest.run_backtest(
-        strategy="large_cap_momentum_top5",
-        bars_by_symbol=aligned,
-        watchlist_symbols=symbols,
-        strategy_rules=rules,
-        start_date=start_date,
-        end_date=end_date,
-        initial_capital=cap_b,
-        max_position_size_pct=20.0,  # 5 positions = 20% each of strategy B capital
-    )
+    if universe_mode == "as_of":
+        # Survivor-bias stress-test path: fetch bars for every symbol that ever
+        # appeared in the as-of universe table, align them to the common-date grid,
+        # then run a per-date filtered backtest.
+        as_of_all_syms = historical_membership.all_known_symbols()
+        extra_needed = [s for s in as_of_all_syms if s not in aligned]
+        if extra_needed:
+            print(f"  [as_of] fetching {len(extra_needed)} additional as-of symbols...")
+        as_of_bars: dict[str, list[dict]] = dict(aligned)  # start with existing aligned bars
+        for sym in extra_needed:
+            try:
+                raw = fetch_bars_yfinance(sym)
+                if raw:
+                    # Filter to the common-date grid established by the anchor symbols.
+                    common_dates = {b["ts"][:10] for b in next(iter(aligned.values()))}
+                    as_of_bars[sym] = [b for b in raw
+                                       if args.start <= b["ts"][:10] <= args.end
+                                       and b["ts"][:10] in common_dates]
+            except Exception as exc:
+                print(f"  [as_of] {sym}: FAILED {exc}")
+            time.sleep(0.05)
+        print(f"  [as_of] universe pool: {len(as_of_bars)} symbols total")
+        result_b = run_strategy_b_as_of(
+            as_of_bars,
+            start_date=start_date,
+            end_date=end_date,
+            initial_capital=cap_b,
+            max_position_size_pct=20.0,
+            strategy_rules=rules,
+        )
+    else:
+        result_b = backtest.run_backtest(
+            strategy="large_cap_momentum_top5",
+            bars_by_symbol=aligned,
+            watchlist_symbols=symbols,
+            strategy_rules=rules,
+            start_date=start_date,
+            end_date=end_date,
+            initial_capital=cap_b,
+            max_position_size_pct=20.0,  # 5 positions = 20% each of strategy B capital
+        )
     print(f"  done in {time.time() - t0:.1f}s; "
           f"return {result_b.total_return_pct:+.2f}%, trades {len(result_b.trades)}")
 
@@ -810,6 +1026,15 @@ def main() -> int:
     parser.add_argument("--sma-months", type=int, default=10,
                         help="Strategy A trend-filter SMA window in months (default 10). "
                              "21 trading days per month; 10 → 210-day SMA (Faber TAA default).")
+    parser.add_argument("--strategy-b-universe-mode", default="modern",
+                        choices=["modern", "as_of"],
+                        dest="strategy_b_universe_mode",
+                        help="'modern' (default): present-day watchlist mega-caps. "
+                             "'as_of': year-by-year point-in-time S&P 100 membership from "
+                             "data/historical/sp100_as_of.json. Used by the survivor-bias "
+                             "stress test to measure how much of Strategy B's edge comes "
+                             "from selecting today's mega-cap survivors vs the actual "
+                             "large-cap basket that existed at each date.")
     parser.add_argument("--label", default="",
                         help="Optional tag included in the report filename")
     parser.add_argument("--no-report", dest="write_report", action="store_false",
