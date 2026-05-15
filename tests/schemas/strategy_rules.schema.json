@@ -20,8 +20,11 @@
             "type": "string",
             "enum": ["ACTIVE_PAPER_TEST", "NEEDS_MORE_DATA", "UNDER_REVIEW", "PAUSED", "REJECTED", "CANDIDATE_FOR_HUMAN_REVIEW"]
           },
+          "allocation_pct": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
           "description": { "type": "string", "minLength": 1 }
-        }
+        },
+        "if": { "properties": { "status": { "const": "ACTIVE_PAPER_TEST" } } },
+        "then": { "required": ["allocation_pct"] }
       }
     },
     "disallowed_strategies": {

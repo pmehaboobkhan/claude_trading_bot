@@ -40,11 +40,11 @@ from dataclasses import dataclass, field
 
 from lib.signals import Signal
 
-# Allocation percentages by strategy name. Mirrors the prose descriptions in
-# `config/strategy_rules.yaml > allowed_strategies > <name> > description`.
-# When `strategy_rules.yaml` gains a structured `allocation_pct` field
-# (proposed in prompts/proposed_updates/2026-05-14_strategy_rules_allocation_field.md),
-# this constant should be replaced with a read of that field.
+# Fallback allocation table — kept as a transitional safety net so the module
+# stays usable without a strategy_rules.yaml in scope (unit tests, tools that
+# don't load config). Production callers should pass `strategy_rules` to
+# `consolidate()` so the live source of truth is
+# `config/strategy_rules.yaml > allowed_strategies > <name> > allocation_pct`.
 STRATEGY_ALLOCATIONS: dict[str, float] = {
     "dual_momentum_taa": 0.60,
     "large_cap_momentum_top5": 0.30,
@@ -72,29 +72,43 @@ class ConsolidatedSignal:
         return len(self.subsumed_strategies) > 0
 
 
-def _allocation_for(strategy: str) -> float:
-    """Look up the allocation pct for a strategy. Unknown strategies receive
-    0.0 — they cannot win a same-symbol tie against any known strategy, which
-    is the safest default. Caller is responsible for filtering rejected
-    strategies upstream (only ACTIVE_PAPER_TEST strategies should reach the
-    consolidator)."""
+def _allocation_for(strategy: str, strategy_rules: dict | None = None) -> float:
+    """Look up the allocation pct for a strategy.
+
+    Reads `strategy_rules > allowed_strategies > <strategy> > allocation_pct`
+    when ``strategy_rules`` is provided. Falls back to ``STRATEGY_ALLOCATIONS``
+    when the config is absent or the field is missing (transitional safety
+    net). Unknown strategies receive 0.0 — they cannot win a same-symbol tie
+    against any known strategy, which is the safest default.
+    """
+    if strategy_rules is not None:
+        for entry in strategy_rules.get("allowed_strategies", []):
+            if entry.get("name") == strategy and "allocation_pct" in entry:
+                return float(entry["allocation_pct"])
     return STRATEGY_ALLOCATIONS.get(strategy, 0.0)
 
 
-def _pick_primary(signals: list[Signal]) -> Signal:
+def _pick_primary(
+    signals: list[Signal],
+    strategy_rules: dict | None = None,
+) -> Signal:
     """Pick the primary signal from a group with the same (symbol, action).
 
     Tie-breakers (in order):
-      1. Highest STRATEGY_ALLOCATIONS value.
+      1. Highest allocation_pct (from config when available, else
+         STRATEGY_ALLOCATIONS fallback).
       2. Lexically smallest strategy name (deterministic).
     """
     return min(
         signals,
-        key=lambda s: (-_allocation_for(s.strategy), s.strategy),
+        key=lambda s: (-_allocation_for(s.strategy, strategy_rules), s.strategy),
     )
 
 
-def consolidate(signals: list[Signal]) -> list[ConsolidatedSignal]:
+def consolidate(
+    signals: list[Signal],
+    strategy_rules: dict | None = None,
+) -> list[ConsolidatedSignal]:
     """Consolidate same-symbol signals from multiple strategies.
 
     Rules:
@@ -115,6 +129,10 @@ def consolidate(signals: list[Signal]) -> list[ConsolidatedSignal]:
 
     Args:
       signals: raw signals as produced by `signals.evaluate_all`.
+      strategy_rules: optional parsed `config/strategy_rules.yaml`. When
+        provided, allocation lookups read from
+        `allowed_strategies[*].allocation_pct`; otherwise the
+        ``STRATEGY_ALLOCATIONS`` fallback table is used.
 
     Returns:
       List of ConsolidatedSignal objects, ordered by (symbol, action) for
@@ -136,7 +154,7 @@ def consolidate(signals: list[Signal]) -> list[ConsolidatedSignal]:
         for action in sorted(actions_map.keys()):
             group = actions_map[action]
             if action in ("ENTRY", "EXIT"):
-                primary = _pick_primary(group)
+                primary = _pick_primary(group, strategy_rules)
                 subsumed = [s.strategy for s in group if s.strategy != primary.strategy]
                 rationale = primary.rationale
                 if subsumed:

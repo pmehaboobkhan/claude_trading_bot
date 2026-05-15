@@ -11,20 +11,28 @@ last_reviewed_by: human
 # Paper trading must consume the circuit_breaker block in config/risk_limits.yaml.
 allowed_strategies:
   # ----- Active v1 strategies (multi-strategy retail portfolio) -----
+  # allocation_pct: structured portfolio fraction (decimal 0.0-1.0). Single source
+  # of truth; the prose figures inside `description` mirror these. The three
+  # ACTIVE_PAPER_TEST entries below must sum to 1.0. Read by
+  # lib/signal_consolidator.py for same-symbol convergence ranking, and (in
+  # follow-ups) by scripts/run_multi_strategy_backtest.py and the Telegram report.
   - name: dual_momentum_taa
     status: ACTIVE_PAPER_TEST
+    allocation_pct: 0.60
     description: >-
       Trend-following + cross-asset momentum across SPY/TLT/GLD with SHV as cash floor.
       Hold the single best-momentum asset that also clears its 10-month MA; otherwise
       hold cash. ~4-8 trades per year. Capital allocation: 60% of portfolio.
   - name: large_cap_momentum_top5
     status: ACTIVE_PAPER_TEST
+    allocation_pct: 0.30
     description: >-
       Hold top-5 large-caps by 6-month total return, equal-weighted, when SPY is above
       its 10-month MA. Exit when stock falls out of top-7 OR SPY trend breaks.
       Capital allocation: 30% of portfolio.
   - name: gold_permanent_overlay
     status: ACTIVE_PAPER_TEST
+    allocation_pct: 0.10
     description: >-
       Permanent 10% allocation to GLD. Crisis/inflation insurance and a diversifier
       that historically has near-zero correlation to both equities and bonds.
