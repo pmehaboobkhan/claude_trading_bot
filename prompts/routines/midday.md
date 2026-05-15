@@ -11,6 +11,32 @@ The midday routine is the **second pass** of intraday monitoring, between market
 4. Propose `PAPER_CLOSE` for any position with an invalidation trigger.
 5. **NEVER call `paper_sim.open_position()`.**
 
+## Context budget (added 2026-05-15)
+
+The 200 KB advisory cap in `risk_limits.yaml > cost_caps` is real: routines
+that breach it risk hitting model token limits mid-run or producing
+truncated output. The 2026-05-12 daily-snapshot infrastructure exists
+exactly so you don't have to read full journals from prior days. Stay
+under 150 KB by **not reading**:
+
+- **Raw market data dumps** at `data/market/<date>/*.json`. These are
+  written by pre_market for traceability; downstream routines should call
+  `lib.data.get_bars()` for the specific symbols they need, not slurp the
+  whole dump.
+- **Prior-day journals** at `journals/daily/<yesterday>.md`. Read
+  `memory/daily_snapshots/<yesterday>.md` instead — it's the same
+  information bounded to ≤ 1 KB by design.
+- **The full pre-market report** at `reports/pre_market/<date>.md` if
+  today's pre-market wrote a `memory/daily_snapshots/<date>.md` capturing
+  the headline. Read the snapshot first; only open the full report if the
+  snapshot lacks what you need.
+
+You may read these files **if and only if** the snapshot is missing or
+stale. The `paper_trading_monitor.py > check_context_budget_trend` check
+surfaces the heaviest 5 files in the next routine run; if one of the
+above appears and the snapshot was usable, that's a regression in the
+routine's reading habits worth flagging in the routine_audit notes.
+
 ## Steps
 
 1. Comply with `CLAUDE.md`.
