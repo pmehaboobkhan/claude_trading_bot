@@ -236,12 +236,19 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 
 ## Phase 2 — Routine prototypes (pre-market + EOD)
 
-- [x] First Claude Code routine: pre-market (06:30 ET) — running on Claude Code web; commits visible 2026-05-13 → 2026-05-14 (e.g. `70fa038 pre-market: research report 2026-05-14`).
-- [x] First Claude Code routine: end-of-day (16:30 ET) — running; commits visible 2026-05-13 → 2026-05-14 (e.g. `c3d29e2 eod: journal + perf 2026-05-14`).
+- [x] First Claude Code routine: pre-market (06:30 ET) — running on Claude Code web; commits visible 2026-05-12 → 2026-05-14.
+- [x] First Claude Code routine: end-of-day (16:30 ET) — running; commits visible 2026-05-12 → 2026-05-14.
 - [x] Telegram notification working — `lib/notify.py > send_documents` is wired into every routine prompt's notification step; given multi-day uninterrupted routine commits, delivery appears unblocked (operator to confirm explicitly if not already).
-- [ ] 5 consecutive trading days of clean pre-market + EOD output, no halt — **in progress**. 2026-05-13 and 2026-05-14 clean. Need 3 more.
+- [ ] 5 consecutive trading days of clean pre-market + EOD output, no halt — **3 of 5 done** (per `scripts/check_phase2_gate.py` run 2026-05-15: CLEAN on 2026-05-12, 2026-05-13, 2026-05-14; 2026-05-15 today is INCOMPLETE — EOD pending). Need today + 2026-05-18 (Mon) to land clean for the gate to clear by EOD 2026-05-18.
 
 **Gate to Phase 3**: 5 days clean; reports human-readable; commits well-formed.
+
+**Gate automation:** `lib/phase2_gate.py` + `scripts/check_phase2_gate.py` (landed 2026-05-15). Per-day evaluation against mechanical criteria (pre-market + EOD commit present, no halt entries, journal ≥ 2 KB, audit `exit_reason` clean). 18 unit tests. Run before claiming gate-pass:
+```
+python3 scripts/check_phase2_gate.py            # rigorous 5-day check
+python3 scripts/check_phase2_gate.py --days 10  # wider visibility
+```
+Exit 0 means gate passes; exit 1 means more clean days needed (or a recent day failed).
 
 ---
 
