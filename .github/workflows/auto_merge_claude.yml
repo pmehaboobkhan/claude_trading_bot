@@ -6,15 +6,24 @@ name: Auto-merge Claude routine branches to main
 # `.claude/hooks/` already enforce every safety rule. This Action collapses
 # Claude's feature branches back into `main` automatically.
 #
-# Triggers on any push to a `claude/*` branch. Fast-forward-merges to main
-# and deletes the source branch. Fails loud (and leaves the branch alone)
-# if the merge would not be a clean fast-forward, so anything weird is
-# visible in the Actions tab instead of silently losing commits.
+# Triggers on any push to `claude/**`, `fix/**`, `feat/**`, `chore/**`, or
+# `docs/**`. Fast-forward-merges to main and deletes the source branch.
+# Fails loud (and leaves the branch alone) if the merge would not be a clean
+# fast-forward, so anything weird is visible in the Actions tab instead of
+# silently losing commits.
+#
+# Note: protected paths (config/*, .claude/agents/*, prompts/routines/*) are
+# still gated by the file-level hooks at write time — auto-merge widens the
+# branch surface but does not bypass those rules.
 
 on:
   push:
     branches:
       - 'claude/**'
+      - 'fix/**'
+      - 'feat/**'
+      - 'chore/**'
+      - 'docs/**'
 
 jobs:
   ff-merge:
