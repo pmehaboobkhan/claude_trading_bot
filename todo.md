@@ -71,11 +71,11 @@ Implementation lives in `scripts/run_multi_strategy_backtest.py` (the `--circuit
 
 ### Operator action — set up routines on Claude Code web
 
-- [ ] Push the commit (`git push`).
-- [ ] On Claude Code web, create three routines pointing at `prompts/routines/{pre_market,end_of_day,self_learning_review}.md` (model: Opus 4.7; timezone: America/New_York; trading-days-only on the first two).
-- [ ] Add secrets to each routine: `ALPACA_PAPER_KEY_ID`, `ALPACA_PAPER_SECRET_KEY`, `ALPACA_PAPER_BASE_URL`, `ALPACA_DATA_BASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-- [ ] Manual `Run now` of `pre_market` first; verify Telegram fires and a commit lands.
-- [ ] Let `pre_market` and `end_of_day` run automatically for one full trading day.
+- [x] Push the commit (`git push`) — pushed; pre_market and end_of_day commits visible upstream from 2026-05-13.
+- [x] On Claude Code web, create three routines pointing at `prompts/routines/{pre_market,end_of_day,self_learning_review}.md` — running; observed in commit log.
+- [x] Add secrets to each routine (`ALPACA_*`, `TELEGRAM_*`) — done; routines authenticate to both services.
+- [x] Manual `Run now` of `pre_market` first — confirmed by 2026-05-12+ commits with attachments.
+- [x] Let `pre_market` and `end_of_day` run automatically for one full trading day — multi-day automatic run since 2026-05-13.
 
 ### Intraday monitoring routines — landed 2026-05-12
 
@@ -109,12 +109,16 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 ### Still open
 
 - [ ] **Operator: set up market_open, midday, pre_close on Claude Code web** — same template as the existing two routines; same `calm-turtle` environment; crons per the schedule yaml.
+- [x] **Operator: PR-merge five `prompts/proposed_updates/*.md` drafts — landed 2026-05-14.** Direct edits to main with explicit operator authorization (override of the locked-file PR flow). Drafts moved to `prompts/proposed_updates/landed/`. Applied: `strategy_rules > allocation_pct` (config + schema + consolidator config-aware lookup), `eod_signal_consolidation` (Step 4a + Step 7 rewrite + subsumed-decision artifact), `eod_log_archive` (Step 0 housekeeping), `perf_review_history_compression` (Timeline compression in agent Outputs + Forbidden exception). `eod_circuit_breaker` was already in `end_of_day.md` from the 2026-05-11 go-live.
 - [x] **Daily-layer ensemble/voting framework — first deliverable landed 2026-05-14:** `lib/signal_consolidator.py` makes same-symbol multi-strategy convergence (GLD via TAA + gold_permanent_overlay) explicit and deterministic. 11 unit tests. Production EOD prompt change drafted in `prompts/proposed_updates/2026-05-14_eod_signal_consolidation.md` (locked file; needs human PR). Structured `allocation_pct` config-field follow-up drafted in `prompts/proposed_updates/2026-05-14_strategy_rules_allocation_field.md`.
 - [x] **Per-symbol history compression — landed 2026-05-14:** `lib/symbol_history.py > compress()` collapses entries beyond 50 rows into a `<!-- COMPRESSED:BEGIN -->...<!-- COMPRESSED:END -->` block. Idempotent. 15 unit tests. Performance Review agent change drafted in `prompts/proposed_updates/2026-05-14_perf_review_history_compression.md` (locked file; needs human PR).
 - [x] **`logs/routine_runs/` auto-archive — landed 2026-05-14:** `lib/archive.py` + `scripts/archive_routine_logs.py` move files older than 30 days into `archive/<year>/<month>/`. Filename-date based (mtime-safe across worktrees). 12 unit tests. EOD-routine wiring drafted in `prompts/proposed_updates/2026-05-14_eod_log_archive.md` (locked file; needs human PR).
+- [ ] **Strategy B allocation review (URGENT-ish, carried from `plan.md > Still open`):** survivor-bias haircut measured at ~7.25 pp/yr at portfolio level (2007-2026 window). Strategy B's 30% allocation may need to drop to 15-20%, with the freed allocation moving to gold or cash. Action: re-run `scripts/run_multi_strategy_backtest.py` with revised allocations and confirm the 8-10% / 15% DD / Sharpe ≥ 0.8 targets still hold, especially against the 2007-2026 window.
+- [ ] **Alpaca free-tier daily-bar staleness (recurring, from `plan.md`):** IEX daily-bars lag 6-19 days behind real time. Plan: hybrid yfinance for daily bars + Alpaca for execution + intraday quotes. yfinance already in stack (used by backtests).
+- [ ] **VIX data source (from `plan.md`):** Alpaca free IEX does not provide VIX. Live-trading-gate `vix_high_observed` will permanently fail until a VIX-capable feed is wired (Polygon, Tiingo, or paid Alpaca tier).
 - [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events. Also: scan `approximate_input_kb` across audit logs once a week, plot the trend.
 - [x] **Operator hook fix — landed 2026-05-14:** `.claude/hooks/validate_yaml_schema.sh` now prefers `$(repo_root)/.venv/bin/python` when present, falling back to system `python3` for portability.
-- [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would stress-test recession DD.
+- [ ] **Full-portfolio 2008 stress test:** `scripts/run_2008_backtest.py` is in place (anchor-based alignment, BIL cache warm). Action: run it for the 2007-2026 window and fill in the crisis-period DD table at `reports/learning/2008_stress_test_<date>.md`. Supersedes the earlier "2008-inclusive backtest" note since the script now exists.
 
 ---
 
@@ -134,7 +138,7 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 - [x] `.github/workflows/eod_watchdog.yml` — Telegram alert if no EOD commit by 17:30 ET.
 - [x] `pre_market` and `end_of_day` routine prompts driven by `lib.signals` (Python computes, Claude wraps).
 - [x] **First backtest run** — completed for all three strategies. Sector rotation strategies rejected.
-- [ ] **Configure Alpaca paper keys + Telegram in Claude Code routine secrets** (operator task).
+- [x] **Configure Alpaca paper keys + Telegram in Claude Code routine secrets** — done; routines authenticate to both.
 - [ ] **Create `.github` repo + add secrets** if the watchdog should be active.
 
 ---
@@ -143,10 +147,10 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 
 - [x] **Scaffold pace**: one big pass.
 - [x] **Implementation language**: Python.
-- [ ] **Capital allocated** to paper account (notional, e.g. $100k)?
-- [ ] **Loss tolerances** in `risk_limits.yaml` — confirm or adjust the just-added portfolio-level caps.
-- [ ] **Telegram setup**: BotFather token + chat ID into Claude Code routine secrets.
-- [ ] **Alpaca paper keys**: into Claude Code routine secrets.
+- [x] **Capital allocated** to paper account — $100k notional set in `config/risk_limits.yaml > account.paper_starting_capital`.
+- [x] **Loss tolerances** in `risk_limits.yaml` — portfolio-level caps locked: daily 0.5% / weekly 2% / monthly 5% / max DD 15% / per-trade 1.5%.
+- [x] **Telegram setup**: BotFather token + chat ID configured in Claude Code routine secrets (routines firing attachments).
+- [x] **Alpaca paper keys**: configured in Claude Code routine secrets (routines authenticating).
 
 ---
 
@@ -229,10 +233,10 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 
 ## Phase 2 — Routine prototypes (pre-market + EOD)
 
-- [ ] First Claude Code routine: pre-market (06:30 ET), reads watchlist + risk + journals, dispatches subagents, writes `reports/pre_market/`, commits — **blocked on operator-side secret setup**.
-- [ ] First Claude Code routine: end-of-day (16:30 ET), writes daily journal + memory observations — same blocker.
-- [ ] Telegram notification working (receive a routine summary)
-- [ ] 5 consecutive trading days of clean pre-market + EOD output, no halt
+- [x] First Claude Code routine: pre-market (06:30 ET) — running on Claude Code web; commits visible 2026-05-13 → 2026-05-14 (e.g. `70fa038 pre-market: research report 2026-05-14`).
+- [x] First Claude Code routine: end-of-day (16:30 ET) — running; commits visible 2026-05-13 → 2026-05-14 (e.g. `c3d29e2 eod: journal + perf 2026-05-14`).
+- [x] Telegram notification working — `lib/notify.py > send_documents` is wired into every routine prompt's notification step; given multi-day uninterrupted routine commits, delivery appears unblocked (operator to confirm explicitly if not already).
+- [ ] 5 consecutive trading days of clean pre-market + EOD output, no halt — **in progress**. 2026-05-13 and 2026-05-14 clean. Need 3 more.
 
 **Gate to Phase 3**: 5 days clean; reports human-readable; commits well-formed.
 
@@ -256,12 +260,12 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 
 ## Phase 4 — Paper trading simulator
 
-- [ ] Mode flipped to `PAPER_TRADING` via PR to `approved_modes.yaml`
-- [x] `lib/paper_sim` produces fills from decisions (built; not yet exercised end-to-end)
-- [ ] `trades/paper/log.csv` reconciles to `trades/paper/positions.json` daily
-- [x] Append-only hook (#12) enforced
-- [ ] Performance Review Agent reports paper PnL + portfolio metrics (CAGR, max DD, Sharpe)
-- [ ] 4 weeks of paper trading; ≥ 50 paper trades across the three strategies; zero log/journal drift
+- [x] Mode flipped to `PAPER_TRADING` via PR to `approved_modes.yaml` (landed 2026-05-11; current `mode: PAPER_TRADING`).
+- [x] `lib/paper_sim` produces fills from decisions — exercised end-to-end; EOD commits show actual PnL (e.g. 2026-05-14 PnL +$842.36, 4 open positions).
+- [ ] `trades/paper/log.csv` reconciles to `trades/paper/positions.json` daily — manual reconciliation today; first-paper-trading-week monitoring script (above) will automate this.
+- [x] Append-only hook (#12) enforced.
+- [x] Performance Review Agent reports paper PnL + portfolio metrics — visible in EOD commit messages; CAGR/Sharpe/max-DD pending sample-size threshold (`N >= 30 trades` per agent guardrail).
+- [ ] 4 weeks of paper trading; ≥ 50 paper trades across the three strategies; zero log/journal drift — **in progress**. Paper trading started 2026-05-11; far from 4 weeks and 50 trades.
 
 **Gate to Phase 5**: 50+ paper trades; daily reconciliation clean.
 

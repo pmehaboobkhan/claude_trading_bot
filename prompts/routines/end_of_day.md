@@ -14,6 +14,17 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
 
 ## Steps
 
+0. **Routine-log archive (housekeeping, non-fatal)** (added 2026-05-14 — `lib/archive.py` + `scripts/archive_routine_logs.py`):
+   ```bash
+   python3 scripts/archive_routine_logs.py --keep-days 30 || \
+     echo "[archive] non-fatal: archive script exited non-zero — continuing"
+   ```
+   Idempotent. Moves any `logs/routine_runs/<YYYY-MM-DD>_*.md` older than 30
+   days into `logs/routine_runs/archive/<year>/<month>/`. Files within the
+   30-day window are untouched. A non-zero exit is recorded in
+   `routine_audit.notes` but does NOT halt EOD — the journal and trade
+   reconciliation logic must run regardless of archival success.
+
 1. Comply with `CLAUDE.md`.
 2. Mode check + schema validation.
 3. Load: open positions, today's pre-market report, regime memory.
@@ -32,6 +43,53 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
    }, default=str, indent=2))
    PYEVAL
    ```
+
+4a. **Same-symbol signal consolidation** (added 2026-05-14 — `lib/signal_consolidator.py`).
+   Convergence (e.g. GLD via `dual_momentum_taa` + `gold_permanent_overlay`) is
+   resolved deterministically here so the routine layer never attempts a
+   double-booking. The macro-ETF position cap in `risk_limits.yaml` still
+   catches anything that slips past, but this step makes the resolution
+   explicit and auditable.
+   ```bash
+   python3 - <<'PYCONS'
+   import json
+   from lib import config, signal_consolidator
+   from lib.signals import Signal
+   # raw_signals is the `sigs` list from step 4. If you piped step 4's JSON
+   # to disk, rehydrate Signal objects from it; if you held the Python
+   # objects in-process, pass them directly.
+   raw_signals = [Signal(**s) for s in <signals from step 4>]
+   consolidated = signal_consolidator.consolidate(
+       raw_signals, config.strategy_rules()
+   )
+   print(json.dumps([
+       {
+           "symbol": cs.symbol,
+           "action": cs.action,
+           "primary_strategy": cs.primary_strategy,
+           "subsumed_strategies": cs.subsumed_strategies,
+           "conflict": cs.conflict,
+           "rationale": cs.rationale,
+       }
+       for cs in consolidated
+   ], indent=2))
+   PYCONS
+   ```
+
+   - **subsumed_strategies non-empty**: the routine opens ONE position for the
+     primary strategy (step 7) and writes a `*_subsumed.json` NO_TRADE
+     decision per subsumed strategy so the Self-Learning Agent can attribute
+     "absorbed ENTRY" as a distinct outcome from "silent." The example
+     `decisions/by_symbol/GLD.md > 2026-05-12 — NO_TRADE (gold_permanent_overlay — subsumed)`
+     entry is what this step now produces automatically.
+   - **conflict=True** (ENTRY+EXIT on the same symbol from different
+     strategies): write `logs/risk_events/<ts>_signal_conflict.md` and send
+     an URGENT Telegram notification. v1 does NOT auto-resolve — proceed
+     with both signals as the routine normally would (EXIT executes; ENTRY
+     is then blocked by the risk manager's "already-flat" check).
+   - **conflict=False, no subsumption**: identical behaviour to the
+     pre-consolidation routine; the consolidator passes the single signal
+     through unchanged.
 
 5. **Circuit-breaker check (Path Z — adopted 2026-05-11)**. Run AFTER signals are computed but BEFORE any paper trade is placed. EXITs are not throttled; only new ENTRYs.
    ```bash
@@ -74,14 +132,42 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
    - Route through `risk_manager` (verify position exists) + `compliance_safety`.
    - On approval, call `lib.paper_sim.close_position(symbol, quote_price=<today_close>, rationale_link=<decision file>)`.
 
-7. For each `ENTRY` signal from an `ACTIVE_PAPER_TEST` strategy:
-   - Verify symbol is in `watchlist.yaml` with `approved_for_paper_trading: true`.
-   - Compute the intended position size per `risk_limits.yaml` (per-strategy / per-symbol caps).
-   - **Apply the circuit-breaker throttle**: `effective_qty = intended_qty * throttle`. If `throttle == 0.0` (state = OUT), **skip the entry entirely** — write the decision with `final_status: REJECTED, reason: circuit_breaker_OUT` and do NOT call `paper_sim.open_position`.
-   - Have `trade_proposal` wrap as `PAPER_BUY` decision (per refactored agent prompt — Claude wraps, doesn't decide). Include `position_size.circuit_breaker_state` and `position_size.throttle_applied` in the decision JSON so the throttle is auditable.
-   - Route through `risk_manager` (checks all `risk_limits.yaml` constraints incl. correlation caps) + `compliance_safety`.
-   - On approval **and** if `approved_modes.yaml > mode == PAPER_TRADING`, call `lib.paper_sim.open_position(..., quantity=effective_qty)`.
-   - If mode is `RESEARCH_ONLY`, write the decision file with `final_status: REJECTED, reason: mode_research_only` — but still record it for backtest comparison.
+7. For each `ConsolidatedSignal` from step 4a with `action == "ENTRY"`
+   (note: `primary_strategy` is the strategy we route on; `subsumed_strategies`
+   are journaled-only):
+   - Verify `symbol` is in `watchlist.yaml` with `approved_for_paper_trading: true`.
+   - Compute the intended position size per `risk_limits.yaml` (per-strategy /
+     per-symbol caps). **Sizing is based on the `primary_strategy`'s allocation,
+     not the sum of contributing strategies** — the whole point of consolidation
+     is that the larger allocation absorbs the smaller one.
+   - **Apply the circuit-breaker throttle**: `effective_qty = intended_qty * throttle`.
+     If `throttle == 0.0` (state = OUT), **skip the entry entirely** — write
+     the decision with `final_status: REJECTED, reason: circuit_breaker_OUT`
+     and do NOT call `paper_sim.open_position`.
+   - Have `trade_proposal` wrap as `PAPER_BUY` decision (one decision file:
+     `decisions/<date>/<HHMM>_<SYM>.json`). Include
+     `position_size.circuit_breaker_state`, `position_size.throttle_applied`,
+     and `consolidation.subsumed_strategies` in the decision JSON.
+   - Route through `risk_manager` + `compliance_safety`.
+   - On approval **and** if `approved_modes.yaml > mode == PAPER_TRADING`,
+     call `lib.paper_sim.open_position(..., quantity=effective_qty)`.
+   - If mode is `RESEARCH_ONLY`, write the decision file with
+     `final_status: REJECTED, reason: mode_research_only` — but still record
+     it for backtest comparison.
+   - **For each subsumed strategy on this ConsolidatedSignal**, write an
+     additional NO_TRADE decision file at
+     `decisions/<date>/<HHMM>_<SYM>_<subsumed_strategy>_subsumed.json`:
+     ```json
+     {
+       "action": "NO_TRADE",
+       "reason": "subsumed_by_<primary_strategy>",
+       "subsumed_under": "decisions/<date>/<HHMM>_<SYM>.json",
+       "symbol": "<SYM>",
+       "strategy": "<subsumed_strategy>"
+     }
+     ```
+     These files are journaling-only; `risk_manager` and `compliance_safety`
+     skip them (already represented by the primary decision).
 
 8. `lib.paper_sim.reconcile()` — any discrepancy → `logs/risk_events/<ts>_reconcile.md` + URGENT notify.
 

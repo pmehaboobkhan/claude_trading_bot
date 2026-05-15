@@ -304,18 +304,25 @@ Plus a routine + docs commit:
 
 Tests: 207 → (still 207; reconciliation is in routine prompt, not lib).
 
+### Landed 2026-05-14 (cross-cutting maintenance + first ensemble deliverable)
+
+Five commits cleared items that had been carried in `Still open` since the pivot. Test suite 232 → 245.
+
+- **`lib/signal_consolidator.py`** (+ 11 tests) — first deliverable of the daily-layer ensemble framework. When two strategies emit ENTRY on the same symbol (the GLD-via-TAA + gold_permanent_overlay case), highest-allocation wins as primary; others recorded as `subsumed_strategies` and routed to a NO_TRADE decision file with `reason: subsumed_by_<primary>`. EXIT never subsumed; ENTRY+EXIT conflict surfaces as `conflict=True` for URGENT operator alert. Production-routine wiring landed via the EOD prompt rewrite (Step 4a). Structured `allocation_pct` field for `config/strategy_rules.yaml` also landed (schema, config, consolidator config-aware lookup); landed drafts archived under `prompts/proposed_updates/landed/`.
+- **`lib/symbol_history.py`** (+ 15 tests) — per-symbol decision-log compression. Once `decisions/by_symbol/<SYM>.md` accumulates > 50 timeline entries, older ones collapse into a `<!-- COMPRESSED:BEGIN -->...<!-- COMPRESSED:END -->` block with counts by action, realized PnL across closed trades, and a pointer to `decisions/by_symbol/archive/<SYM>_pre_<date>.md` for full history. Idempotent. Performance Review wiring landed in `.claude/agents/performance_review.md > Outputs` (Timeline compression step).
+- **`lib/archive.py` + `scripts/archive_routine_logs.py`** (+ 12 tests) — auto-archive `logs/routine_runs/*.md` files older than 30 days into `logs/routine_runs/archive/<year>/<month>/`. Filename-date based so it's mtime-safe across worktrees. EOD-routine wiring landed as Step 0 (housekeeping, non-fatal).
+- **`docs/risk_profile.md`** — full rewrite for the post-pivot multi-strategy portfolio. Captures absolute-return goal (8-10% CAGR / 15% DD / Sharpe ≥ 0.8), 60/30/10 allocations, Path Z circuit-breaker thresholds, regime-diversity gates, halt triggers, and known limitations. Sign-off slot pending operator signature on PR merge.
+- **`.claude/hooks/validate_yaml_schema.sh`** — prefers `$(repo_root)/.venv/bin/python` when present, falling back to system `python3` (closes the operator hook portability item).
+
 ### Still open
 
 - [ ] Operator action: set up the three new intraday monitoring routines on Claude Code web (same template as pre_market / end_of_day; cron per `config/routine_schedule.yaml`; same `calm-turtle` environment).
+- [x] Operator action: PR-merge the five `prompts/proposed_updates/*.md` drafts — **landed 2026-05-14**. All five drafts moved to `prompts/proposed_updates/landed/`. PR #3 (circuit-breaker EOD wiring) was already in `end_of_day.md` as of the 2026-05-11 go-live. PR #1 (allocation_pct), PR #2 (signal-consolidation Step 4a + Step 7 rewrite), PR #4 (Step 0 log archive), and PR #5 (perf-review compression step) applied directly to main with explicit operator authorization, bypassing the normal locked-file PR flow.
 - [ ] **Strategy B allocation review (URGENT-ish):** measured survivor-bias haircut of ~7.25 pp/yr at portfolio level (2007-2026 window) suggests Strategy B's allocated capital may need to drop from 30% (e.g., to 15-20%, with the freed allocation moving to gold or cash). Pending: re-run the multi-strategy backtest with revised allocations and confirm the 8-10% / 15% DD / Sharpe ≥ 0.8 targets still hold, especially against the 2007-2026 window.
 - [ ] **Alpaca free-tier daily-bar staleness (recurring):** IEX feed daily-bars lag 6-19 days behind real time. Plan: hybrid yfinance for daily bars + Alpaca for execution + intraday quotes. yfinance already in stack (used by backtests).
 - [ ] **VIX data source:** Alpaca free IEX does not provide VIX. Live-trading-gate `vix_high_observed` will permanently fail until a VIX-capable feed is wired (Polygon, Tiingo, or paid Alpaca tier).
-- [ ] Daily-layer ensemble/voting framework (next 2–4 weeks). Concrete first deliverable: handle the dual_momentum_taa-AND-gold_permanent_overlay both pointing at GLD case explicitly rather than relying on the macro-ETF cap to catch it.
-- [ ] Per-symbol history compression: when `decisions/by_symbol/<SYM>.md` timeline exceeds 50 rows, Performance Review collapses older rows into a "Summary before <date>" header block. Read load stabilizes.
-- [ ] `logs/routine_runs/` auto-archive to `logs/routine_runs/archive/<year>/<month>/` after 30 days.
 - [ ] Full-portfolio 2008 stress test: run `python scripts/run_2008_backtest.py` (anchor-based alignment is now in place; BIL cache warm) to get the 2007-2026 window metrics and fill in the crisis-period DD table in `reports/learning/2008_stress_test_<date>.md`.
-- [ ] First paper-trading week: monitor `trades/paper/circuit_breaker.json` updates daily.
-- [ ] Operator hook update: `.claude/hooks/validate_yaml_schema.sh` calls system `python3`; consider preferring `.venv/bin/python` in the hook for portability.
+- [ ] First paper-trading week monitoring: daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events. Also: scan `approximate_input_kb` across audit logs once a week, plot the trend.
 
 ### Files materially changed today
 - `lib/signals.py` — three new strategy functions; `STRATEGY_FUNCS` dispatcher; TAA risk-asset set; deterministic.
