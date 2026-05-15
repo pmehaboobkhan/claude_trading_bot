@@ -86,6 +86,10 @@ You **may not** write to:
 ## Trading limitations (v1)
 
 - Paper trading only. Long-only ETFs.
+- Paper-trade routing controlled by env `BROKER_PAPER`:
+  - `sim` (default): internal CSV simulator only. Trades land in `trades/paper/log.csv` + `positions.json`. Nothing reaches Alpaca.
+  - `alpaca`: every `paper_sim.open_position` / `close_position` ALSO submits a market order to the Alpaca paper sandbox via `lib.broker.submit_market_order`. Real fill price + slippage vs sim recorded in the log's notes column. EOD step 8a reconciles local vs Alpaca; divergence is an URGENT alert. See `docs/operator_runbook.md > Alpaca paper-account mirror mode` for enablement.
+- Live mode (`mode == LIVE_EXECUTION`) is still completely off in v1 regardless of `BROKER_PAPER`.
 - Universe = 12 sector ETFs (see `config/watchlist.yaml`).
 - Risk Manager enforces per-position, total-exposure, sector-correlation, daily-loss, weekly-loss, monthly-loss, and consecutive-loss limits.
 - A trade only opens when **all** of: R/R ≥ minimum threshold; data fresh; Risk Manager APPROVES; Compliance/Safety APPROVES.

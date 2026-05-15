@@ -55,3 +55,41 @@
 2. Update Claude Code routine secrets (and `.env.local` if you use it).
 3. Rotate Telegram bot token via @BotFather only if compromised — otherwise leave alone.
 4. Document rotation in `docs/risk_profile.md > rotation_history`.
+
+## Alpaca paper-account mirror mode (BROKER_PAPER)
+
+By default the system uses an internal CSV simulator for fills (`BROKER_PAPER=sim`,
+or unset). Trades land in `trades/paper/log.csv` + `positions.json` only — **nothing
+reaches Alpaca**. To enable real Alpaca paper trades:
+
+### One-time enablement (operator-run, ~5 min)
+
+1. Confirm credentials are set in the cloud routine env:
+   - `ALPACA_PAPER_KEY_ID`
+   - `ALPACA_PAPER_SECRET_KEY`
+2. Sanity check from a local shell (with creds in env): `python3 scripts/sync_alpaca_state.py`
+   - Reports current local-vs-Alpaca divergence. Expect divergence on first run.
+3. **Fresh-start the state** (DESTRUCTIVE — closes all Alpaca positions, clears local):
+   ```bash
+   python3 scripts/sync_alpaca_state.py --reset-fresh-start
+   ```
+   Writes a paired `logs/risk_events/<ts>_state_reset.md` audit. CB resets to FULL.
+4. Set `BROKER_PAPER=alpaca` in the cloud routine env.
+5. Wait for the next end_of_day routine. First new ENTRY signals will land on
+   Alpaca for real; the log will record broker fill prices + slippage vs sim.
+
+### Verification after enablement
+
+- `scripts/sync_alpaca_state.py` should print "in sync" each day.
+- EOD step 8a runs `lib.paper_sim.reconcile()` + the broker-mirror check; any
+  divergence triggers an URGENT Telegram alert.
+- Log rows in `trades/paper/log.csv` will have `broker_fill=` and `slippage_vs_sim=`
+  values in the `notes` column when mirror mode is active.
+
+### Reverting
+
+- Set `BROKER_PAPER=sim` (or unset) in the cloud routine env.
+- Existing Alpaca positions remain on the broker until you close them manually
+  or run `--reset-fresh-start` again.
+- The local sim state continues from where it was — won't match Alpaca anymore,
+  but that's the expected outcome of leaving mirror mode.

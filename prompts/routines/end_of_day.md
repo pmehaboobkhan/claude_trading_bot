@@ -85,6 +85,39 @@ This is intentionally simpler than the v2 multi-routine flow. It also avoids int
 
 8. `lib.paper_sim.reconcile()` — any discrepancy → `logs/risk_events/<ts>_reconcile.md` + URGENT notify.
 
+8a. **Alpaca-mirror reconciliation** (only if env `BROKER_PAPER == "alpaca"`):
+
+   ```bash
+   python3 - <<'PYRECONCILE'
+   import json, os, sys
+   if os.environ.get("BROKER_PAPER", "sim").lower() != "alpaca":
+       print("[mirror] BROKER_PAPER=sim — skipping broker reconciliation"); sys.exit(0)
+   from lib import broker, paper_sim
+   local = json.loads(paper_sim.POSITIONS_PATH.read_text())
+   bpos = {p["symbol"]: p for p in broker.get_positions()}
+   only_local = set(local) - set(bpos)
+   only_broker = set(bpos) - set(local)
+   qty_mismatch = [s for s in set(local) & set(bpos)
+                   if abs(float(local[s]["quantity"]) - float(bpos[s]["qty"])) > 1e-6]
+   if only_local or only_broker or qty_mismatch:
+       print(f"[mirror] DIVERGENCE: only_local={sorted(only_local)} "
+             f"only_broker={sorted(only_broker)} qty_mismatch={qty_mismatch}")
+       sys.exit(1)
+   print(f"[mirror] in sync ({len(local)} positions match)")
+   PYRECONCILE
+   ```
+
+   - On exit code 1 (divergence): write `logs/risk_events/<ts>_alpaca_mirror_divergence.md`
+     with the specifics, send URGENT Telegram, and DO NOT proceed past this step
+     until the operator runs `python3 scripts/sync_alpaca_state.py --reset-fresh-start`
+     or manually reconciles.
+   - On exit code 0: log "alpaca-mirror in sync" to the routine_audit notes.
+
+   The routine should NOT attempt to auto-resolve mirror divergence. State drift
+   between the local sim ledger and Alpaca is a meaningful event that requires
+   human inspection — could indicate an order rejection, partial fill, manual
+   broker-side intervention, or a bug in `paper_sim.open_position`'s mirror path.
+
 9. `performance_review`:
    - Today's PnL on paper portfolio.
    - Update Cumulative-stats header on `decisions/by_symbol/<SYM>.md` for symbols with activity today.

@@ -263,6 +263,47 @@ Added a sixth operating mode: `SAFE_MODE`. Same deterministic strategy + paper-f
 
 Files: `lib/operating_mode.py` (12 tests), `.claude/hooks/safe_mode_writes.sh`, `.claude/commands/enter-safe-mode.md`, schema (`tests/schemas/approved_modes.schema.json`) + transitions doc (`config/approved_modes.yaml`). CLAUDE.md updated. Routine + agent guards land directly (Bash bypass per session consent).
 
+### Alpaca paper-account mirror mode — landed 2026-05-14
+
+Until today, "paper trading" was 100% internal CSV simulator (`lib/paper_sim.py`).
+Operator noticed their Alpaca paper account was empty despite ~3 days of sim
+activity. Diagnosis: `lib/broker.py` only had READ methods (account_snapshot,
+get_positions); no order placement. Routine prompts called `paper_sim.open_position`
+which only wrote to `log.csv` + `positions.json`.
+
+Three commits land the mirror infrastructure (sim default unchanged):
+
+- `bf3aba2`: `lib/broker.py` gains `submit_market_order`, `get_order`,
+  `cancel_all_open_orders`, `close_all_positions`. Live mode still gated.
+  8 unit tests with mocked alpaca-py.
+- `606fc6a`: `lib/paper_sim.py` env-controlled mirror via `BROKER_PAPER=alpaca`.
+  When enabled, every open/close submits a market order, polls 5s for fill,
+  records broker fill price + slippage vs sim in the log's notes column.
+  Falls back to sim price on broker failure (does not crash the routine).
+  Default `BROKER_PAPER=sim` preserves current behavior. 10 unit tests.
+- `631b7df`: `scripts/sync_alpaca_state.py` reconciliation + `--reset-fresh-start`
+  destructive setup that closes all Alpaca positions, clears local positions.json,
+  appends a RESET marker to log.csv (append-only), resets CB to FULL with
+  peak=current Alpaca equity, writes paired `logs/risk_events/<ts>_state_reset.md`.
+
+Plus a routine + docs commit:
+
+- end_of_day step 8a: when `BROKER_PAPER=alpaca`, reconciles local vs Alpaca
+  positions; any divergence is URGENT alert + halt-progression (no auto-resolve).
+- `docs/operator_runbook.md > Alpaca paper-account mirror mode`: enablement
+  walkthrough.
+
+**Operator action remaining (not part of this commit):**
+
+1. Confirm `ALPACA_PAPER_KEY_ID` / `ALPACA_PAPER_SECRET_KEY` set in cloud env.
+2. Run `python3 scripts/sync_alpaca_state.py --reset-fresh-start` from a shell
+   with creds. Closes the 4 dormant sim positions (GLD/GOOGL/WMT/XOM), resets
+   the inflated CB peak ($119,140 → current Alpaca equity), aligns state.
+3. Set `BROKER_PAPER=alpaca` in cloud routine env.
+4. Next end_of_day routine will start placing real Alpaca paper orders.
+
+Tests: 207 → (still 207; reconciliation is in routine prompt, not lib).
+
 ### Still open
 
 - [ ] Operator action: set up the three new intraday monitoring routines on Claude Code web (same template as pre_market / end_of_day; cron per `config/routine_schedule.yaml`; same `calm-turtle` environment).
