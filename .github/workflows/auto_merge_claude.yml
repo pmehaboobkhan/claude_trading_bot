@@ -21,6 +21,7 @@ on:
     branches:
       - 'claude/**'
       - 'fix/**'
+      - 'fix:**'
       - 'feat/**'
       - 'chore/**'
       - 'docs/**'
