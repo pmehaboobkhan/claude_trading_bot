@@ -109,11 +109,11 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 ### Still open
 
 - [ ] **Operator: set up market_open, midday, pre_close on Claude Code web** — same template as the existing two routines; same `calm-turtle` environment; crons per the schedule yaml.
-- [ ] **Daily-layer ensemble/voting framework** (next 2–4 weeks). First deliverable: explicit handling for two strategies converging on the same symbol (e.g. GLD via TAA + gold_permanent_overlay).
-- [ ] **Per-symbol history compression** — when `decisions/by_symbol/<SYM>.md` timeline > 50 rows, Performance Review collapses older rows into a summary header. Stabilizes context load on long-lived symbols.
-- [ ] **`logs/routine_runs/` auto-archive** to `archive/<year>/<month>/` after 30 days.
+- [x] **Daily-layer ensemble/voting framework — first deliverable landed 2026-05-14:** `lib/signal_consolidator.py` makes same-symbol multi-strategy convergence (GLD via TAA + gold_permanent_overlay) explicit and deterministic. 11 unit tests. Production EOD prompt change drafted in `prompts/proposed_updates/2026-05-14_eod_signal_consolidation.md` (locked file; needs human PR). Structured `allocation_pct` config-field follow-up drafted in `prompts/proposed_updates/2026-05-14_strategy_rules_allocation_field.md`.
+- [x] **Per-symbol history compression — landed 2026-05-14:** `lib/symbol_history.py > compress()` collapses entries beyond 50 rows into a `<!-- COMPRESSED:BEGIN -->...<!-- COMPRESSED:END -->` block. Idempotent. 15 unit tests. Performance Review agent change drafted in `prompts/proposed_updates/2026-05-14_perf_review_history_compression.md` (locked file; needs human PR).
+- [x] **`logs/routine_runs/` auto-archive — landed 2026-05-14:** `lib/archive.py` + `scripts/archive_routine_logs.py` move files older than 30 days into `archive/<year>/<month>/`. Filename-date based (mtime-safe across worktrees). 12 unit tests. EOD-routine wiring drafted in `prompts/proposed_updates/2026-05-14_eod_log_archive.md` (locked file; needs human PR).
 - [ ] **First paper-trading week monitoring** — daily check of `trades/paper/circuit_breaker.json`, `trades/paper/log.csv` reconciliation, no risk events. Also: scan `approximate_input_kb` across audit logs once a week, plot the trend.
-- [ ] **Operator hook fix** — `.claude/hooks/validate_yaml_schema.sh` invokes system `python3`. User-level `pip install jsonschema` is in place, but for portability the hook should prefer `.venv/bin/python` when present.
+- [x] **Operator hook fix — landed 2026-05-14:** `.claude/hooks/validate_yaml_schema.sh` now prefers `$(repo_root)/.venv/bin/python` when present, falling back to system `python3` for portability.
 - [ ] **2008-inclusive backtest** when feasible — current window starts 2013 due to META IPO. SPY-only proxy for Strategy B during 2005–2013 would stress-test recession DD.
 
 ---
@@ -157,10 +157,10 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 - [x] Broker chosen: Alpaca (paper now, live Phase 8+)
 - [x] Notifications: Telegram
 - [x] Data feed: Alpaca free (IEX); historical backtests via yfinance
-- [ ] Write `/docs/risk_profile.md` from the new goal + portfolio-level loss tolerances
-- [ ] Sign-off (commit `/docs/risk_profile.md` as ground truth)
+- [x] Write `/docs/risk_profile.md` from the new goal + portfolio-level loss tolerances — landed 2026-05-14.
+- [ ] Sign-off (commit `/docs/risk_profile.md` as ground truth — pending operator signature on the PR that merges the rewrite)
 
-**Gate to Phase 1**: numeric loss limits exist; broker chosen; universe & goal locked. ✅ except risk_profile.md write-up.
+**Gate to Phase 1**: numeric loss limits exist; broker chosen; universe & goal locked. ✅ — risk_profile.md write-up landed 2026-05-14, awaiting operator sign-off.
 
 ---
 
@@ -176,7 +176,7 @@ Cause of the 404s: private repo returns 404 to unauthenticated viewers; even on 
 - [x] `docs/operator_runbook.md`
 - [x] `docs/incident_response.md`
 - [x] `docs/model_limitations.md`
-- [ ] `docs/risk_profile.md` (still to write — needs current portfolio targets, not sector-rotation framing)
+- [x] `docs/risk_profile.md` — rewritten 2026-05-14 for the multi-strategy retail portfolio. Captures 8–10% / 15% DD / Sharpe 0.8 goal, allocations, loss tolerances, halt triggers, live unlock criteria, and known limitations (survivor bias, 2008 stress test pending, VIX data absence). Sign-off slot pending operator signature on PR merge.
 - [x] `docs/commit_messages.md`
 
 ### Schemas & tests
