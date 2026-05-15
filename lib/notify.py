@@ -258,3 +258,48 @@ def send_documents_html(paths: list[str | Path], *, caption: str | None = None) 
         if ok:
             delivered += 1
     return delivered
+
+
+# ---------- Routine heartbeat (no-op runs) ----------
+
+def send_heartbeat(
+    *,
+    routine: str,
+    timestamp_utc: str,
+    mode: str,
+    open_positions: int,
+    cb_state: str = "n/a",
+    equity_usd: float | None = None,
+    exit_reason: str = "noop",
+    extra_lines: list[str] | None = None,
+) -> bool:
+    """Send a short "routine ran cleanly" Telegram message.
+
+    The default policy in market_open.md / midday.md is to suppress Telegram on
+    pure no-op runs (no action, no risk event). That silence is indistinguishable
+    from "routine never fired" — which actually happened on 2026-05-15 before
+    the user noticed market_open was running remotely on a side branch.
+
+    A heartbeat fixes the observability gap: at most one short message per
+    no-op routine, with just enough state for the operator to confirm the
+    routine actually ran. For routines that DID take action, callers should
+    keep using `send_html()` with the full action summary instead — heartbeats
+    are explicitly for no-op runs.
+
+    Returns True on send success (or False if credentials missing / send fails).
+    Never raises.
+    """
+    lines = [
+        f"{bold(routine + ' ✓')} <i>(no action)</i>",
+        f"• {bold('When (UTC):')} {code(timestamp_utc)}",
+        f"• {bold('Mode:')} {code(mode)}",
+        f"• {bold('Positions:')} {open_positions}",
+        f"• {bold('Circuit-breaker:')} {code(cb_state)}",
+    ]
+    if equity_usd is not None:
+        lines.append(f"• {bold('Equity:')} ${equity_usd:,.2f}")
+    lines.append(f"• {bold('Exit reason:')} {code(exit_reason)}")
+    if extra_lines:
+        for line in extra_lines:
+            lines.append(f"• {line}")
+    return send_html("\n".join(lines))

@@ -18,11 +18,19 @@ Override via env: BAR_SOURCE=alpaca to force the legacy all-Alpaca path
 """
 from __future__ import annotations
 
+import logging
 import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from lib.broker import BrokerError, credentials
+
+logger = logging.getLogger(__name__)
+
+# One-shot guard: only attempt the auto-install once per process.
+_YFINANCE_AUTOINSTALL_ATTEMPTED = False
 
 
 @dataclass
@@ -95,6 +103,49 @@ def _bar_source() -> str:
     return os.environ.get("BAR_SOURCE", "yfinance").strip().lower()
 
 
+def _import_yfinance_with_autoinstall():
+    """Import yfinance, attempting a one-shot pip install if missing.
+
+    The remote scheduled-agent environment sometimes lacks yfinance even though
+    it's pinned in requirements.txt — the silent fallback to Alpaca IEX then
+    produces 6-19 day stale daily bars. Self-healing here keeps routines fresh
+    without operator intervention. On install failure the BrokerError makes
+    the cause obvious instead of leaking the import error upstream.
+    """
+    global _YFINANCE_AUTOINSTALL_ATTEMPTED
+    try:
+        import yfinance as yf
+        return yf
+    except ImportError as exc:
+        if _YFINANCE_AUTOINSTALL_ATTEMPTED:
+            raise BrokerError(
+                "yfinance not installed and auto-install already attempted this "
+                "process. Run scripts/bootstrap_env.sh or `pip install -r requirements.txt`."
+            ) from exc
+        _YFINANCE_AUTOINSTALL_ATTEMPTED = True
+        logger.warning("yfinance missing — attempting one-shot pip install")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", "yfinance>=0.2.40"],
+                check=True,
+                timeout=120,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise BrokerError(
+                f"yfinance auto-install failed: {exc}. "
+                "Run scripts/bootstrap_env.sh or `pip install -r requirements.txt`."
+            ) from exc
+        try:
+            import yfinance as yf
+            logger.warning("yfinance auto-install succeeded")
+            return yf
+        except ImportError as exc:
+            raise BrokerError(
+                "yfinance import still fails after auto-install — "
+                "environment may need a clean restart."
+            ) from exc
+
+
 def _get_bars_yfinance(symbol: str, *, limit: int) -> list[dict]:
     """Daily bars via yfinance.
 
@@ -102,10 +153,7 @@ def _get_bars_yfinance(symbol: str, *, limit: int) -> list[dict]:
     No API key required. Caller-side caching at backtests/_yfinance_cache/
     is for backtests only — production routines fetch fresh.
     """
-    try:
-        import yfinance as yf
-    except ImportError as exc:  # pragma: no cover
-        raise BrokerError("yfinance not installed (required for daily bars)") from exc
+    yf = _import_yfinance_with_autoinstall()
 
     end_dt = datetime.now(UTC)
     start_dt = end_dt - timedelta(days=_calendar_days_for("1Day", limit))

@@ -370,5 +370,83 @@ def test_send_documents_html_returns_count(monkeypatch, tmp_path):
     assert "caption" not in captures[1] or captures[1]["caption"] is None
 
 
+# ---------------------------------------------------------------------------
+# send_heartbeat() — no-op routine pings
+# ---------------------------------------------------------------------------
+
+def test_send_heartbeat_returns_false_without_credentials(no_creds):
+    assert notify.send_heartbeat(
+        routine="market_open",
+        timestamp_utc="2026-05-15T13:35:00Z",
+        mode="PAPER_TRADING",
+        open_positions=0,
+    ) is False
+
+
+def test_send_heartbeat_posts_html_with_routine_and_state(stub_creds, monkeypatch):
+    captured: dict = {}
+
+    def fake_post(url, json=None, timeout=None):
+        captured["json"] = json
+        return _FakeResponse(200)
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    ok = notify.send_heartbeat(
+        routine="market_open",
+        timestamp_utc="2026-05-15T13:35:00Z",
+        mode="PAPER_TRADING",
+        open_positions=0,
+        cb_state="FULL",
+        equity_usd=102_496.62,
+        exit_reason="noop",
+    )
+    assert ok is True
+    text = captured["json"]["text"]
+    assert "market_open" in text
+    assert captured["json"]["parse_mode"] == "HTML"
+    # The "no action" tag is the disambiguator vs a real action-summary message.
+    assert "no action" in text
+    assert "FULL" in text
+    assert "102,496.62" in text
+    assert "PAPER_TRADING" in text
+
+
+def test_send_heartbeat_includes_extra_lines(stub_creds, monkeypatch):
+    captured: dict = {}
+
+    def fake_post(url, json=None, timeout=None):
+        captured["json"] = json
+        return _FakeResponse(200)
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    notify.send_heartbeat(
+        routine="midday",
+        timestamp_utc="2026-05-15T16:03:00Z",
+        mode="PAPER_TRADING",
+        open_positions=0,
+        cb_state="FULL",
+        extra_lines=["<b>News:</b> connector REACHABLE"],
+    )
+    assert "News" in captured["json"]["text"]
+    assert "REACHABLE" in captured["json"]["text"]
+
+
+def test_send_heartbeat_omits_equity_when_none(stub_creds, monkeypatch):
+    captured: dict = {}
+
+    def fake_post(url, json=None, timeout=None):
+        captured["json"] = json
+        return _FakeResponse(200)
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    notify.send_heartbeat(
+        routine="midday",
+        timestamp_utc="2026-05-15T16:03:00Z",
+        mode="PAPER_TRADING",
+        open_positions=0,
+    )
+    assert "Equity" not in captured["json"]["text"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

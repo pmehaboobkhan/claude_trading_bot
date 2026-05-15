@@ -273,24 +273,48 @@ def close_position(symbol: str, *, quote_price: float, rationale_link: str,
     return fill
 
 
+RESET_TOKENS = ("RESET", "MARKER", "_RESET_", "_MARKER_")
+
+
+def _is_reset_row(row: dict) -> bool:
+    for field in ("symbol", "side", "status"):
+        if row.get(field, "").strip().upper() in RESET_TOKENS:
+            return True
+    return False
+
+
 def reconcile() -> dict:
     """Recompute open positions from log.csv and verify it matches positions.json.
 
     Returns a dict with `discrepancies` listing any mismatches. Used by EOD routine.
+
+    log.csv is append-only. When ``sync_alpaca_state.py --reset-fresh-start``
+    runs, it appends a watershed row with ``symbol=_RESET_`` / ``status=RESET``;
+    everything above that line is closed at the broker side and ``positions.json``
+    is overwritten to ``{}``. We only consider rows AFTER the latest reset
+    marker — pre-reset OPENs are stale, not divergence.
     """
     _ensure_log()
     open_from_log: dict[str, dict] = {}
     with LOG_PATH.open("r", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            sym = row["symbol"]
-            if row["status"] == "OPEN":
-                open_from_log[sym] = {
-                    "side": row["side"],
-                    "quantity": float(row["quantity"]),
-                    "entry_price": float(row["simulated_price"]),
-                }
-            elif row["status"] == "CLOSED":
-                open_from_log.pop(sym, None)
+        rows = list(csv.DictReader(f))
+    last_reset_idx = -1
+    for i, row in enumerate(rows):
+        if _is_reset_row(row):
+            last_reset_idx = i
+    live_rows = rows[last_reset_idx + 1 :] if last_reset_idx >= 0 else rows
+    for row in live_rows:
+        if _is_reset_row(row):
+            continue
+        sym = row["symbol"]
+        if row["status"] == "OPEN":
+            open_from_log[sym] = {
+                "side": row["side"],
+                "quantity": float(row["quantity"]),
+                "entry_price": float(row["simulated_price"]),
+            }
+        elif row["status"] == "CLOSED":
+            open_from_log.pop(sym, None)
 
     on_disk = _read_positions()
     discrepancies = []

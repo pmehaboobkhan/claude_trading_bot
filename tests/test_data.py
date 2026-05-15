@@ -88,6 +88,87 @@ def test_calendar_days_for_unknown_raises():
         ld._calendar_days_for("1Week", 10)
 
 
+def test_yfinance_autoinstall_succeeds_when_pip_succeeds(monkeypatch):
+    """If yfinance is missing, attempt a one-shot pip install and re-import."""
+    monkeypatch.setattr(ld, "_YFINANCE_AUTOINSTALL_ATTEMPTED", False)
+    monkeypatch.delitem(sys.modules, "yfinance", raising=False)
+
+    install_calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        install_calls.append(cmd)
+
+        class _Result:
+            returncode = 0
+        # After "install" call, register a fake yfinance module.
+        fake_yf = type(sys)("yfinance")
+        fake_yf.__version__ = "0.2.99"
+        sys.modules["yfinance"] = fake_yf
+        return _Result()
+
+    monkeypatch.setattr(ld.subprocess, "run", fake_run)
+    # First import attempt MUST fail to trigger the install path.
+    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+    state = {"first": True}
+
+    def gated_import(name, *args, **kwargs):
+        if name == "yfinance" and state["first"]:
+            state["first"] = False
+            raise ImportError("not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", gated_import)
+    yf = ld._import_yfinance_with_autoinstall()
+    assert yf.__version__ == "0.2.99"
+    assert install_calls and "yfinance>=0.2.40" in install_calls[0]
+
+
+def test_yfinance_autoinstall_raises_brokererror_on_pip_failure(monkeypatch):
+    """Pip-install failure surfaces as BrokerError with actionable hint."""
+    import subprocess as sp
+    monkeypatch.setattr(ld, "_YFINANCE_AUTOINSTALL_ATTEMPTED", False)
+    monkeypatch.delitem(sys.modules, "yfinance", raising=False)
+
+    def fake_run(cmd, **kwargs):
+        raise sp.CalledProcessError(1, cmd, output="network down")
+
+    monkeypatch.setattr(ld.subprocess, "run", fake_run)
+    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+
+    def gated_import(name, *args, **kwargs):
+        if name == "yfinance":
+            raise ImportError("not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", gated_import)
+    with __import__("pytest").raises(ld.BrokerError, match="auto-install failed"):
+        ld._import_yfinance_with_autoinstall()
+
+
+def test_yfinance_autoinstall_only_attempted_once(monkeypatch):
+    """Second call within same process raises immediately without retrying pip."""
+    monkeypatch.setattr(ld, "_YFINANCE_AUTOINSTALL_ATTEMPTED", True)
+    monkeypatch.delitem(sys.modules, "yfinance", raising=False)
+    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+
+    def gated_import(name, *args, **kwargs):
+        if name == "yfinance":
+            raise ImportError("not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", gated_import)
+
+    call_count = [0]
+
+    def fake_run(cmd, **kwargs):
+        call_count[0] += 1
+
+    monkeypatch.setattr(ld.subprocess, "run", fake_run)
+    with __import__("pytest").raises(ld.BrokerError, match="already attempted"):
+        ld._import_yfinance_with_autoinstall()
+    assert call_count[0] == 0
+
+
 def test_get_bars_yfinance_returns_canonical_dict_shape(monkeypatch):
     """Mock yfinance.download to verify output shape conformance."""
     import pandas as pd
