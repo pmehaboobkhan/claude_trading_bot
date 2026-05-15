@@ -323,22 +323,33 @@ def check_context_budget_trend(
     *,
     kb_warn: int = DEFAULT_KB_WARN,
     kb_fail: int = DEFAULT_KB_FAIL,
+    heavy_file_min_kb: int = 10,
+    heavy_file_top_n: int = 5,
 ) -> Finding:
     """Trend `approximate_input_kb` across the audits passed in.
 
     The latest reading drives the severity; the average is reported for
     context. The intent is to surface drift before the 200 KB advisory cap
     in `risk_limits.yaml > cost_caps` is breached.
+
+    When the severity escalates to WARN/FAIL, the finding's detail includes a
+    ``heaviest_files`` list pulled from the latest audit's ``files_read`` —
+    the actual largest files driving the budget. Lets the operator see at
+    a glance which file to compress or stop reading without grepping audits.
     """
-    kbs = [int(a["approximate_input_kb"]) for a in audits
-           if isinstance(a.get("approximate_input_kb"), (int, float))]
-    if not kbs:
+    audit_kbs: list[tuple[dict, int]] = []
+    for a in audits:
+        kb = a.get("approximate_input_kb")
+        if isinstance(kb, (int, float)):
+            audit_kbs.append((a, int(kb)))
+    if not audit_kbs:
         return Finding(
             check="context_budget_trend",
             severity=OK,
             summary="no audit files with approximate_input_kb in window",
         )
-    latest = kbs[-1]
+    latest_audit, latest = audit_kbs[-1]
+    kbs = [kb for _, kb in audit_kbs]
     avg = sum(kbs) / len(kbs)
     if latest >= kb_fail:
         sev = FAIL
@@ -346,6 +357,21 @@ def check_context_budget_trend(
         sev = WARN
     else:
         sev = OK
+    detail = {
+        "latest_kb": latest,
+        "avg_kb": round(avg, 1),
+        "n_samples": len(kbs),
+        "thresholds": {"warn": kb_warn, "fail": kb_fail},
+    }
+    if sev != OK:
+        files = latest_audit.get("files_read", []) or []
+        sized = []
+        for f in files:
+            b = int(f.get("bytes", 0) or 0)
+            if b >= heavy_file_min_kb * 1024:
+                sized.append({"path": f.get("path", ""), "bytes": b})
+        sized.sort(key=lambda x: -x["bytes"])
+        detail["heaviest_files"] = sized[:heavy_file_top_n]
     return Finding(
         check="context_budget_trend",
         severity=sev,
@@ -353,12 +379,7 @@ def check_context_budget_trend(
             f"latest approximate_input_kb={latest} (avg {avg:.1f} over "
             f"{len(kbs)} audit(s); warn {kb_warn} / fail {kb_fail})"
         ),
-        detail={
-            "latest_kb": latest,
-            "avg_kb": round(avg, 1),
-            "n_samples": len(kbs),
-            "thresholds": {"warn": kb_warn, "fail": kb_fail},
-        },
+        detail=detail,
     )
 
 
@@ -409,6 +430,11 @@ def format_report(report: Report) -> str:
     ]
     for f in report.findings:
         lines.append(f"[{f.severity:4}] {f.check}: {f.summary}")
+        heavy = f.detail.get("heaviest_files") if isinstance(f.detail, dict) else None
+        if heavy:
+            for h in heavy:
+                kb = h["bytes"] / 1024
+                lines.append(f"         • {kb:>5.1f} KB  {h['path']}")
     lines.append("")
     lines.append(f"Exit code: {report.exit_code}")
     return "\n".join(lines)

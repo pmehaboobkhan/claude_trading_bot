@@ -255,6 +255,47 @@ def test_kb_uses_latest_for_severity_not_average():
     assert finding.detail["latest_kb"] == 200
 
 
+def test_kb_warn_surfaces_heaviest_files():
+    """When the latest audit warns/fails, the finding's detail must include
+    the actual heavy files driving the budget so the operator knows what to
+    cut without grepping audit YAML."""
+    audits = [
+        {
+            "approximate_input_kb": 178,
+            "files_read": [
+                {"path": "journals/daily/2026-05-14.md", "bytes": 45000},
+                {"path": "reports/pre_market/2026-05-14.md", "bytes": 18000},
+                {"path": "data/market/2026-05-14/0630.json", "bytes": 18000},
+                {"path": "CLAUDE.md", "bytes": 12000},  # > 10 KB threshold
+                {"path": "trades/paper/positions.json", "bytes": 500},
+            ],
+        },
+    ]
+    finding = pm.check_context_budget_trend(audits, kb_warn=150, kb_fail=190)
+    assert finding.severity == pm.WARN
+    heavy = finding.detail["heaviest_files"]
+    # Files >= 10 KB show up, sub-10KB dropped, sorted by size desc, top 5.
+    assert [h["path"] for h in heavy] == [
+        "journals/daily/2026-05-14.md",
+        "reports/pre_market/2026-05-14.md",
+        "data/market/2026-05-14/0630.json",
+        "CLAUDE.md",
+    ]
+
+
+def test_kb_ok_omits_heaviest_files():
+    """No need to surface heavy files when budget is fine — keep output clean."""
+    audits = [
+        {
+            "approximate_input_kb": 30,
+            "files_read": [{"path": "x.md", "bytes": 30000}],
+        },
+    ]
+    finding = pm.check_context_budget_trend(audits, kb_warn=150, kb_fail=190)
+    assert finding.severity == pm.OK
+    assert "heaviest_files" not in finding.detail
+
+
 # ---------------------------------------------------------------------------
 # parse_audit
 # ---------------------------------------------------------------------------
