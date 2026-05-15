@@ -156,3 +156,136 @@ def latest_quotes_for_positions() -> dict[str, float]:
             raise BrokerError(f"stale/zero quote for open position {p['symbol']}")
         quotes[p["symbol"]] = q.last_price
     return quotes
+
+
+# ---------------------------------------------------------------------------
+# Order placement (paper-mirror mode — see lib.paper_sim BROKER_PAPER=alpaca)
+# ---------------------------------------------------------------------------
+# Live orders are STILL refused unless mode == LIVE_EXECUTION via credentials().
+# Paper orders go to Alpaca's paper sandbox at https://paper-api.alpaca.markets.
+
+def submit_market_order(symbol: str, *, qty: float, side: str,
+                        client_order_id: str | None = None,
+                        time_in_force: str = "day") -> dict:
+    """Submit a market order to the broker (paper sandbox in PAPER_TRADING mode).
+
+    Args:
+      symbol: Equity ticker.
+      qty: Share quantity (positive). Fractional shares supported.
+      side: "BUY" or "SELL".
+      client_order_id: Optional client-side ID for idempotency. Caller should pass
+        a value derived from `decisions/<date>/<HHMM>_<sym>.json` so the order is
+        traceable back to the decision file.
+      time_in_force: "day" (default) | "gtc" | "ioc" | "fok".
+
+    Returns the broker's order acknowledgement as a plain dict. Does NOT wait
+    for the fill — use the returned `id` to poll if a synchronous result is needed.
+    """
+    try:
+        from alpaca.trading.client import TradingClient
+        from alpaca.trading.enums import OrderSide, TimeInForce
+        from alpaca.trading.requests import MarketOrderRequest
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("alpaca-py not installed") from exc
+
+    if side.upper() not in ("BUY", "SELL"):
+        raise BrokerError(f"invalid side {side!r}; expected BUY or SELL")
+    if qty <= 0:
+        raise BrokerError(f"qty must be positive, got {qty}")
+
+    creds = credentials(want_live=False)
+    client = TradingClient(creds.key_id, creds.secret, paper=not creds.is_live)
+    req = MarketOrderRequest(
+        symbol=symbol,
+        qty=qty,
+        side=OrderSide.BUY if side.upper() == "BUY" else OrderSide.SELL,
+        time_in_force=getattr(TimeInForce, time_in_force.upper()),
+        client_order_id=client_order_id,
+    )
+    order = client.submit_order(order_data=req)
+    return {
+        "id": str(order.id),
+        "client_order_id": order.client_order_id,
+        "symbol": order.symbol,
+        "qty": float(order.qty),
+        "side": str(order.side),
+        "status": str(order.status),
+        "submitted_at": order.submitted_at.isoformat() if order.submitted_at else None,
+        "is_paper": not creds.is_live,
+    }
+
+
+def get_order(order_id: str) -> dict:
+    """Fetch the latest state of a previously-submitted order.
+
+    Used to poll for fill price after `submit_market_order` (which returns
+    immediately on submit, not on fill).
+    """
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("alpaca-py not installed") from exc
+
+    creds = credentials(want_live=False)
+    client = TradingClient(creds.key_id, creds.secret, paper=not creds.is_live)
+    o = client.get_order_by_id(order_id)
+    return {
+        "id": str(o.id),
+        "client_order_id": o.client_order_id,
+        "symbol": o.symbol,
+        "qty": float(o.qty),
+        "filled_qty": float(o.filled_qty or 0),
+        "filled_avg_price": float(o.filled_avg_price) if o.filled_avg_price else None,
+        "side": str(o.side),
+        "status": str(o.status),
+        "submitted_at": o.submitted_at.isoformat() if o.submitted_at else None,
+        "filled_at": o.filled_at.isoformat() if o.filled_at else None,
+    }
+
+
+def cancel_all_open_orders() -> int:
+    """Cancel every open (unfilled / partially filled) order. Returns count canceled."""
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("alpaca-py not installed") from exc
+
+    creds = credentials(want_live=False)
+    client = TradingClient(creds.key_id, creds.secret, paper=not creds.is_live)
+    responses = client.cancel_orders()
+    return len(responses)
+
+
+def close_all_positions(*, cancel_orders: bool = True) -> list[dict]:
+    """Liquidate every open position via market orders. Returns the close-order
+    acknowledgements.
+
+    Used by `scripts/sync_alpaca_state.py --reset-fresh-start`. Pairs with
+    cancel_all_open_orders to start from a clean broker-side state.
+    """
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:  # pragma: no cover
+        raise BrokerError("alpaca-py not installed") from exc
+
+    creds = credentials(want_live=False)
+    client = TradingClient(creds.key_id, creds.secret, paper=not creds.is_live)
+    responses = client.close_all_positions(cancel_orders=cancel_orders)
+    out: list[dict] = []
+    for r in responses or []:
+        try:
+            body = r.body if hasattr(r, "body") else r
+            order = body if hasattr(body, "id") else getattr(body, "order", None)
+            if order is None:
+                continue
+            out.append({
+                "id": str(order.id),
+                "symbol": order.symbol,
+                "qty": float(order.qty),
+                "side": str(order.side),
+                "status": str(order.status),
+            })
+        except (AttributeError, TypeError):
+            # Tolerate variations in alpaca-py response shape across versions.
+            continue
+    return out
