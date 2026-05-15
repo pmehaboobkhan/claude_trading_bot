@@ -4,11 +4,18 @@
 > haircut of ~7.25 pp/yr at portfolio level (2007-2026 window) suggests
 > Strategy B's allocated capital may need to drop from 30%."
 >
-> **TL;DR: do NOT reduce Strategy B's allocation based on this review alone.**
-> The 2008-inclusive backtest shows extreme sensitivity to B's allocation
-> that the 2013+ production window does not exhibit. Two windows tell two
-> different stories. Decision should wait on the survivor-bias-corrected
-> backtest (`plan.md > "2026-05-12-survivor-bias-stress-test"`).
+> **TL;DR (original, kept for traceability): do NOT reduce Strategy B's
+> allocation based on this review alone — 2008-inclusive shows extreme
+> sensitivity, production window does not.**
+>
+> **Update later same day:** investigating that sensitivity uncovered a
+> blend bug in `apply_circuit_breaker` (now fixed; see `2008_stress_test_2026-05-15.md`).
+> With the corrected blend, **the 2008-inclusive allocation sensitivity
+> disappears** — B=30 produces 3.58% CAGR and B=25 produces 3.78% CAGR.
+> The 7pp swing was an artifact of the legacy floating-weight bias. The
+> original decision ("keep B at 30%") still stands but for a different
+> reason: on the corrected backtest, allocations are essentially
+> equivalent on both windows; there is no upside to changing B.
 
 ## Allocations tested
 

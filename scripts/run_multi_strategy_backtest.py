@@ -198,6 +198,8 @@ def apply_circuit_breaker(
     out_dd: float,
     recovery_dd: float,
     out_recover_dd: float,
+    per_strategy_curves: dict[str, list[tuple[str, float]]] | None = None,
+    target_weights: dict[str, float] | None = None,
 ) -> tuple[list[tuple[str, float]], list[dict]]:
     """Walk daily with a portfolio DD throttle.
 
@@ -205,6 +207,19 @@ def apply_circuit_breaker(
     `strategy_combined_curve` is the sum of all strategy equity curves over time.
     `shv_curve` is an SHV buy-and-hold curve on $1 of capital, used to compute
     the cash leg's daily return.
+
+    If `per_strategy_curves` and `target_weights` are provided (the corrected
+    path, 2026-05-15), daily blended returns are computed as the **target-weight
+    sum of each strategy's per-day return** — i.e. assuming the portfolio is
+    rebalanced daily back to target. This matches how the paper-trading
+    routines size positions (based on current equity, not strategy capital that
+    has compounded independently). Otherwise, falls back to dollar-weighted
+    returns from the un-throttled combined curve, which has a path-dependent
+    bias when strategies diverge in return: B's compounded weight in the
+    combined curve outgrows A and C, so its daily returns dominate the
+    "blended" return that the CB scales. That bias overstates portfolio CAGR
+    when B has a huge backtest tail-return (the +5,351% survivor-biased case)
+    and understates it when B is reduced — exactly the symptom A3 surfaced.
     """
     thresholds = portfolio_risk.CircuitBreakerThresholds(
         half_dd=half_dd,
@@ -212,7 +227,6 @@ def apply_circuit_breaker(
         half_to_full_recover_dd=recovery_dd,
         out_to_half_recover_dd=out_recover_dd,
     )
-    strat_rets = _daily_returns(strategy_combined_curve)
     cash_rets = {d: r for d, r in _daily_returns(shv_curve)}
 
     cb_state = portfolio_risk.CircuitBreakerState()
@@ -220,6 +234,42 @@ def apply_circuit_breaker(
     events: list[dict] = []
     curve: list[tuple[str, float]] = []
 
+    use_target_blend = per_strategy_curves is not None and target_weights is not None
+    if use_target_blend:
+        # Pre-compute per-strategy daily returns indexed by date.
+        per_rets: dict[str, dict[str, float]] = {
+            name: {d: r for d, r in _daily_returns(c)}
+            for name, c in per_strategy_curves.items()
+        }
+        # Walk the date sequence from the combined curve (already aligned).
+        dates_seq = [d for d, _ in strategy_combined_curve]
+
+        for date in dates_seq:
+            blended_ret = sum(
+                target_weights.get(name, 0.0) * per_rets.get(name, {}).get(date, 0.0)
+                for name in target_weights
+            )
+            throttle = portfolio_risk.exposure_fraction(cb_state.state)
+            cash_ret = cash_rets.get(date, 0.0)
+            port_ret = throttle * blended_ret + (1 - throttle) * cash_ret
+            portfolio = portfolio * (1 + port_ret)
+
+            result = portfolio_risk.step(cb_state, portfolio, thresholds)
+            if result.transitioned:
+                events.append({
+                    "date": date,
+                    "from": result.previous_state,
+                    "to": result.new_state.state,
+                    "dd_pct": result.drawdown * 100,
+                    "portfolio": portfolio,
+                })
+            cb_state = result.new_state
+            curve.append((date, portfolio))
+        return curve, events
+
+    # Legacy code path — preserved for reproducibility of historical backtest
+    # outputs. Has the floating-weight bias documented above.
+    strat_rets = _daily_returns(strategy_combined_curve)
     for date, strat_ret in strat_rets:
         throttle = portfolio_risk.exposure_fraction(cb_state.state)
         cash_ret = cash_rets.get(date, 0.0)
@@ -759,6 +809,20 @@ def run_backtest(args) -> dict:
         )["equity_curve"]
         # CB starts with the deployed capital (strategy capital), not args.capital,
         # so the cash buffer (if any) is preserved and added back at the end.
+        #
+        # By default (2026-05-15+) the CB blends per-strategy daily returns
+        # using target weights — i.e. it simulates daily rebalancing back to
+        # the target alloc-a/b/c. The legacy floating-weight code path is
+        # available via --legacy-cb-blend for reproducing pre-fix backtests.
+        cb_per_strategy = None
+        cb_target_weights = None
+        if not getattr(args, "legacy_cb_blend", False):
+            cb_per_strategy = {
+                "dual_momentum_taa": result_a.equity_curve,
+                "large_cap_momentum_top5": result_b.equity_curve,
+                "gold_permanent_overlay": result_c["equity_curve"],
+            }
+            cb_target_weights = dict(ALLOCATION)
         cb_curve, cb_events = apply_circuit_breaker(
             strategy_only_curve,
             shv_ref,
@@ -767,6 +831,8 @@ def run_backtest(args) -> dict:
             out_dd=args.cb_out_dd,
             recovery_dd=args.cb_recovery_dd,
             out_recover_dd=args.cb_out_recover_dd,
+            per_strategy_curves=cb_per_strategy,
+            target_weights=cb_target_weights,
         )
         # Rebuild portfolio_curve = circuit-broken deployed leg + (optional) cash buffer leg.
         date_to_cb = dict(cb_curve)
@@ -1007,6 +1073,12 @@ def main() -> int:
                              "Use BIL or SHY for windows that start before SHV's 2007-01-11 listing. "
                              "BIL (launched 2007-05-30) and SHY (launched 2002-07-26) are short-T-bill "
                              "equivalents with slightly different yield characteristics. Default: SHV.")
+    parser.add_argument("--legacy-cb-blend", action="store_true",
+                        help="Use the pre-2026-05-15 floating-weight blend in the circuit-breaker "
+                             "(daily returns derived from the un-throttled combined curve). "
+                             "Has a path-dependent bias that overstates portfolio CAGR when one "
+                             "strategy has a huge backtest tail-return. Kept for reproducing "
+                             "historical backtests; new runs should omit this flag.")
     parser.add_argument("--circuit-breaker", action="store_true",
                         help="Apply portfolio-level drawdown circuit-breaker. Throttle state "
                              "machine: FULL (100%% strategies) → HALF (50%%) at --cb-half-dd → "
