@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-05-15T20:41:26Z",
+  "routine_id": "end_of_day_2026-05-15",
+  "symbol": "GLD",
+  "decision": "NO_TRADE",
+  "strategy": "gold_permanent_overlay",
+  "thesis_bull": "gold_permanent_overlay is a permanent 10% GLD allocation policy that fires an ENTRY every routine by design — it is crisis/inflation insurance and a near-zero-correlation diversifier to both equities and bonds. The book is flat post the 2026-05-15T00:31:53Z fresh-start reset, so there is no existing GLD exposure; under normal data conditions this would be the first leg re-established (and would ordinarily be subsumed under dual_momentum_taa, which today produced no GLD signal only because price data was unavailable to compute its 12m-return / 10mo-MA confirmations).",
+  "thesis_bear": "Market data is entirely unavailable at EOD: the yfinance data host is blocked ('Host not in allowlist') and there is no fresh cached fallback — all 25 watchlist symbols returned zero bars, the regime detector degraded to 'uncertain / low' with every indicator null, and the most recent usable daily bar across the system remains 2026-05-08 (7 calendar days stale versus the 60-second max_data_staleness_seconds cap). With no current GLD price there is no defensible entry, stop, target, position size, or fill. Opening blind would violate CLAUDE.md rule #5 (stale data => NO_TRADE) and the capital-preservation mandate. News connector is also offline (all symbols news_unavailable — treated as a risk factor, not as bullish).",
+  "invalidation_condition": "Market-data feed restored to within data.max_data_staleness_seconds (fresh GLD daily bar at or near the current session close). When data is fresh again at a subsequent EOD, re-evaluate the gold_permanent_overlay ENTRY for a real fill, sized off the primary strategy's allocation per the consolidator, and re-establish the permanent 10% leg.",
+  "risk_reward": {
+    "entry": 0,
+    "stop": 0,
+    "target": 0,
+    "ratio": 0
+  },
+  "position_size": {
+    "shares": 0,
+    "usd": 0,
+    "pct_of_account": 0,
+    "circuit_breaker_state": "FULL",
+    "throttle_applied": 1.0,
+    "intended_shares_pre_throttle": 0,
+    "intended_usd_pre_throttle": 0,
+    "intended_pct_pre_throttle": 0,
+    "sizing_basis": "Not computable: no current GLD price. gold_permanent_overlay targets ~10% of the $102,496.62 post-reset account; size cannot be derived without a fresh quote. CB is FULL (throttle 1.0) so the data-staleness gate — not the circuit-breaker — is the binding constraint."
+  },
+  "consolidation": {
+    "primary_strategy": "gold_permanent_overlay",
+    "subsumed_strategies": [],
+    "conflict": false,
+    "note": "dual_momentum_taa produced no GLD signal this run solely because price data was unavailable to evaluate its confirmations; under fresh data GLD would normally be subsumed under Strategy A's larger 60% allocation."
+  },
+  "confidence_score": 0.5,
+  "confidence_notes": "Confidence in the NO_TRADE routing itself is very high (~0.98) — total data unavailability is a mechanical hard gate. The 0.50 reflects neutral confidence in the underlying permanent-overlay thesis: the policy is sound but unverifiable today with no price, regime, or news inputs.",
+  "risk_manager_verdict": "APPROVED",
+  "risk_manager_notes": "NO_TRADE adds no exposure and reduces no risk; APPROVED on the conservative side. Had this been PAPER_BUY it would be a hard REJECT: market data unavailable for all symbols and most-recent bar 2026-05-08 (>> 60s max_data_staleness_seconds). No valid entry/stop/target derivable; risk-per-trade and position-cap checks are moot without a price. Mechanical data gate fails before any strategic check. Book is flat post-reset; no portfolio interaction.",
+  "compliance_verdict": "APPROVED",
+  "compliance_notes": "GLD is on watchlist.yaml with approved_for_paper_trading=true (max_position_size_pct=60); gold_permanent_overlay is ACTIVE_PAPER_TEST; mode PAPER_TRADING. NO_TRADE recorded for prediction-review traceability and is the correct routing under the data-staleness hard gate. Schema-compliant. No live execution. No protected-file writes. Note: operator intent per 2026-05-15_003153_state_reset.md was BROKER_PAPER=alpaca, but runtime env has BROKER_PAPER unset (=sim); flagged to journal/audit — not a trade-decision blocker since no trade is placed.",
+  "human_approval_required": false,
+  "final_status": "NO_TRADE",
+  "rejection_reason": "data_unavailable_all_symbols AND data_staleness_breach (latest bar 2026-05-08, cap 60s)",
+  "data_provenance": {
+    "signals_source": "lib.signals.evaluate_all at EOD 2026-05-15T20:40:18Z — all 25 symbols failed to fetch (yfinance host blocked); only data-free gold_permanent_overlay policy signal emitted",
+    "pre_market_snapshot": "memory/daily_snapshots/2026-05-14.md + reports/pre_market/2026-05-15.md (pre-market also reported 7-day data lag)",
+    "quote_source": "UNAVAILABLE — yfinance 'Host not in allowlist'; no cached fallback returned bars",
+    "quote_at_close": null,
+    "daily_bar_latest_ts": "2026-05-08 (per pre-market journal; no fresher bar retrievable at EOD)",
+    "daily_bar_staleness_days": 7,
+    "max_data_staleness_seconds": 60,
+    "regime": "uncertain (low confidence) — degraded; all indicators null due to data outage",
+    "news_status": "news_unavailable (connector offline) — treated as risk factor",
+    "circuit_breaker_state": "FULL",
+    "circuit_breaker_peak_equity": 102496.62,
+    "circuit_breaker_current_equity": 102496.62,
+    "circuit_breaker_dd_pct": 0.0,
+    "throttle": 1.0,
+    "book_state": "flat (positions.json == {}) post 2026-05-15T00:31:53Z reset"
+  }
+}

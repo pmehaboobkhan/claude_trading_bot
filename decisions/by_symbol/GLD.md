@@ -56,3 +56,33 @@
 - Unrealized PnL (mark $428.01): -$94.39 (-0.64%)
 - Win rate: n/a (no closed trades)
 - Active strategies: dual_momentum_taa (primary), gold_permanent_overlay (subsumed)
+
+## 2026-05-15 — Fresh-start reset (state re-baseline)
+
+- Event: `scripts/sync_alpaca_state.py --reset-fresh-start` at 2026-05-15T00:31:53Z
+  (`logs/risk_events/2026-05-15_003153_state_reset.md`). Local positions.json
+  cleared to `{}` to align with Alpaca paper (0 positions, $102,496.62 equity).
+  The pre-reset GLD line (qty 34 @ $430.7861) is no longer an open position;
+  prior rows above are immutable historical record only.
+
+## 2026-05-15 — NO_TRADE (gold_permanent_overlay)
+
+- Decision file: `decisions/2026-05-15/2041_GLD.json`
+- Signal: ENTRY (gold_permanent_overlay permanent-policy; data-free). No
+  dual_momentum_taa GLD signal this run — price data unavailable to evaluate
+  its 12m-return / 10mo-MA confirmations.
+- Routine: end_of_day_2026-05-15, mode PAPER_TRADING, cb_state=FULL (no
+  transition; DD 0.00%), throttle=1.0.
+- Rejection: market data unavailable for all 25 symbols (yfinance host
+  blocked) and latest bar 2026-05-08 (~7 cal days, >> 60s staleness cap).
+  Hard NO_TRADE gate per CLAUDE.md rule #5. No fill, no exposure.
+- Risk Manager: APPROVED (NO_TRADE adds no risk). Compliance: APPROVED.
+
+**Cumulative stats (updated 2026-05-15 EOD):**
+
+- Open paper positions: 0 (flat post 2026-05-15T00:31:53Z fresh-start reset)
+- Closed paper trades: 0 (post-reset); pre-reset history immutable above
+- Realized PnL: $0.00
+- Unrealized PnL: $0.00 (no open position)
+- Win rate: n/a (no closed trades)
+- Active strategies: dual_momentum_taa (primary), gold_permanent_overlay (subsumed) — none held; data-blocked
