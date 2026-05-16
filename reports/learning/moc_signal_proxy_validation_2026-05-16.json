@@ -1,0 +1,156 @@
+{
+  "total_days": 60,
+  "agreeing_days": 52,
+  "agreement_rate": 0.8667,
+  "verdict": "FAIL",
+  "reasons": [
+    "agreement_rate 0.8667 < required 0.99",
+    "4 day(s) had a regime-label flip \u2014 inspect each"
+  ],
+  "divergent_days": [
+    {
+      "date": "2026-02-27",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "AAPL",
+          "close_action": "NONE",
+          "proxy_action": "EXIT"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "PFE",
+          "close_action": "EXIT",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "range_bound",
+      "regime_proxy": "uncertain"
+    },
+    {
+      "date": "2026-03-02",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "PFE",
+          "close_action": "NONE",
+          "proxy_action": "ENTRY"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "TSLA",
+          "close_action": "ENTRY",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "range_bound",
+      "regime_proxy": "bullish_trend"
+    },
+    {
+      "date": "2026-03-06",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "CSCO",
+          "close_action": "NONE",
+          "proxy_action": "ENTRY"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "TSLA",
+          "close_action": "ENTRY",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "range_bound",
+      "regime_proxy": "uncertain"
+    },
+    {
+      "date": "2026-03-11",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "CSCO",
+          "close_action": "NONE",
+          "proxy_action": "ENTRY"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "TSLA",
+          "close_action": "ENTRY",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "uncertain",
+      "regime_proxy": "uncertain"
+    },
+    {
+      "date": "2026-04-17",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "PFE",
+          "close_action": "NONE",
+          "proxy_action": "ENTRY"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "WMT",
+          "close_action": "ENTRY",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "range_bound",
+      "regime_proxy": "range_bound"
+    },
+    {
+      "date": "2026-04-20",
+      "divergences": [],
+      "regime_close": "bullish_trend",
+      "regime_proxy": "range_bound"
+    },
+    {
+      "date": "2026-04-22",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "AMZN",
+          "close_action": "NONE",
+          "proxy_action": "ENTRY"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "JNJ",
+          "close_action": "ENTRY",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "range_bound",
+      "regime_proxy": "range_bound"
+    },
+    {
+      "date": "2026-05-05",
+      "divergences": [
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "COST",
+          "close_action": "NONE",
+          "proxy_action": "EXIT"
+        },
+        {
+          "strategy": "large_cap_momentum_top5",
+          "symbol": "PFE",
+          "close_action": "EXIT",
+          "proxy_action": "NONE"
+        }
+      ],
+      "regime_close": "bullish_trend",
+      "regime_proxy": "bullish_trend"
+    }
+  ],
+  "per_strategy_divergences": {
+    "large_cap_momentum_top5": 14
+  },
+  "regime_flip_days": 4,
+  "min_agreement_rate": 0.99
+}
