@@ -366,6 +366,7 @@ def run_strategy_b_as_of(
     initial_capital: float,
     max_position_size_pct: float = 20.0,
     strategy_rules: dict,
+    fill_timing: str = "close",
 ) -> BacktestResult:
     """Run large_cap_momentum_top5 with a year-by-year point-in-time universe.
 
@@ -446,7 +447,10 @@ def run_strategy_b_as_of(
                     fill_price = 0.0
                 else:
                     fill_price = simulated_fill_price(
-                        side="CLOSE", quote_price=float(bars_for_sym[-1]["close"]), model=fm
+                        side="CLOSE",
+                        quote_price=backtest._fill_quote(
+                            all_bars[sig.symbol], i, fill_timing=fill_timing),
+                        model=fm,
                     )
                 proceeds = p.quantity * fill_price
                 cash += proceeds
@@ -473,8 +477,8 @@ def run_strategy_b_as_of(
         # ENTRYs.
         for sig in my_signals:
             if sig.action == "ENTRY" and sig.symbol not in positions and sig.symbol in slice_by_symbol:
-                bars_for_sym = slice_by_symbol[sig.symbol]
-                quote = float(bars_for_sym[-1]["close"])
+                quote = backtest._fill_quote(
+                    all_bars[sig.symbol], i, fill_timing=fill_timing)
                 fill_price = simulated_fill_price(side="BUY", quote_price=quote, model=fm)
                 equity_now = cash + sum(
                     pp.quantity * float(slice_by_symbol[s][-1]["close"])
@@ -508,7 +512,7 @@ def run_strategy_b_as_of(
     for sym, p in list(positions.items()):
         sym_bars = all_bars.get(sym, [])
         if sym_bars and end_idx <= len(sym_bars):
-            quote = float(sym_bars[end_idx - 1]["close"])
+            quote = backtest._fill_quote(sym_bars, end_idx - 1, fill_timing=fill_timing)
             fill_price = simulated_fill_price(side="CLOSE", quote_price=quote, model=fm)
         else:
             fill_price = 0.0
@@ -743,6 +747,7 @@ def run_backtest(args) -> dict:
             initial_capital=cap_b,
             max_position_size_pct=20.0,
             strategy_rules=rules,
+            fill_timing=getattr(args, "strategy_b_fill", "close"),
         )
     else:
         result_b = backtest.run_backtest(
