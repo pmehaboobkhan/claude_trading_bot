@@ -150,7 +150,7 @@ Repo renamed **`claude_trading_bot` → `calm_turtle`**. No local action (GitHub
 
 ### Still open after 2026-05-16
 
-- [ ] **Option B not enabled — gated on humans.** (1) Quant sign-off: accept B live on "passes minimum CLAUDE.md targets with a ≈−0.5pp realistic-execution drag, no upside assumed." (2) Per-strategy live execution wiring as a PR-locked routine/schedule proposal + human PR: **A & C → MOC@close** (signal-proxy clean), **B → close-signal + next-open market fill**. Until both land: `BROKER_PAPER=sim` only (the validated interim).
+- [ ] **Go live on Alpaca paper — Monday 2026-05-18.** Simple model adopted ([PR #20](https://github.com/pmehaboobkhan/calm_turtle/pull/20), Alpaca-authoritative mirror): Alpaca is the source of truth, no phantom fills, no false halt, zero PR-locked edits. Supersedes the MOC + per-strategy proposals. Fills next-open (≈−0.5pp/yr vs backtest — that's the real friction we're going live to observe). **Operator steps only:** merge PR #20; web env → `BROKER_PAPER=alpaca` + Alpaca paper keys + repo binding `pmehaboobkhan/calm_turtle` + keep Yahoo/Alpaca allowlist. Book flat/aligned from the 2026-05-15 reset — no re-reset.
 - [ ] **Operator: confirm web-routine repo bindings → `pmehaboobkhan/calm_turtle`** and paste the two corrected web-instruction files into the web UI; add `finance.yahoo.com` to the agent allowlist (defensive).
 
 ---

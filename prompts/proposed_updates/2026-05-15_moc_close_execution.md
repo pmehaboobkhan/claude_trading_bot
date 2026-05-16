@@ -2,7 +2,7 @@
 
 **Author:** Claude (assistant)
 **Date:** 2026-05-15
-**Status:** DRAFT — awaiting human PR review. Do NOT enable `BROKER_PAPER=alpaca` until this (or an alternative) is adopted.
+**Status:** **SUPERSEDED 2026-05-16 by PR #20** (Alpaca-authoritative mirror). The operator runs no quant validation loop and wants the real Alpaca paper account live with a simple uniform model. MOC two-phase execution is not being pursued. Retained for historical record only.
 **Reason:** Operator wants real Alpaca paper-mirror trading. Investigation found that flipping `BROKER_PAPER=alpaca` under the current schedule does not produce clean paper fills — it produces a daily mirror-divergence halt — because the only routine that opens positions runs *after* the regular-session close.
 
 ## Problem statement (verified)

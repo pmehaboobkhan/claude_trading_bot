@@ -2,7 +2,7 @@
 
 **Author:** Claude (assistant)
 **Date:** 2026-05-16
-**Status:** DRAFT — awaiting human PR review. **Supersedes** `2026-05-15_moc_close_execution.md` (its uniform-MOC assumption was invalidated by the signal-proxy gate for strategy B).
+**Status:** **SUPERSEDED 2026-05-16 by PR #20** (Alpaca-authoritative mirror — one uniform honest model). The operator is not running a quant loop and wants a simple live-Monday path; the per-strategy A/C-vs-B split is not being implemented. Retained for historical record / future reference only.
 **Do NOT** set `BROKER_PAPER=alpaca` until this lands + quant sign-off + a market-day dry-run.
 
 ## Why this supersedes the original MOC proposal
