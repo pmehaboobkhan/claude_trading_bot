@@ -19,6 +19,7 @@ import csv
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -271,6 +272,157 @@ def close_position(symbol: str, *, quote_price: float, rationale_link: str,
     append_fill(fill)
     _write_positions(pos)
     return fill
+
+
+def submit_moc_entry(*, symbol: str, side: str, quantity: float,
+                     rationale_link: str, stop_loss: float, take_profit: float,
+                     notes: str = "") -> PaperFill:
+    """Phase 1 of two-phase MOC execution: submit a Market-On-Close entry.
+
+    The order fills in the 16:00 closing auction — NOT now — so this does not
+    poll for a fill and does not fall back to a sim price (the bug that makes
+    the legacy after-close DAY-market path divergence-halt). It appends a
+    PENDING_MOC breadcrumb row carrying the broker order id; positions.json is
+    left untouched until `confirm_moc_fills()` records the real auction fill in
+    phase 2. `reconcile()` ignores PENDING_MOC rows (only OPEN/CLOSED count),
+    so a pending order never registers as a divergence.
+    """
+    if broker_mode() != "alpaca":
+        raise ValueError(
+            "submit_moc_entry requires BROKER_PAPER=alpaca; in sim mode the "
+            "close-price fill is applied by open_position at the EOD run."
+        )
+    from lib import broker
+    coid = _client_order_id(rationale_link, "moc_open")
+    ack = broker.submit_moc_order(
+        symbol, qty=quantity, side=side, client_order_id=coid,
+    )
+    fill = PaperFill(
+        timestamp=datetime.now(UTC).isoformat(),
+        symbol=symbol,
+        side=side,
+        quantity=quantity,
+        simulated_price=0.0,  # unknown until the closing auction (phase 2)
+        rationale_link=rationale_link,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        status="PENDING_MOC",
+        realized_pnl=0.0,
+        notes=(notes + f"; moc_pending order_id={ack.get('id', '?')}"
+               f" status={ack.get('status', '?')}"),
+    )
+    append_fill(fill)
+    return fill
+
+
+_ORDER_ID_RE = re.compile(r"order_id=(\S+)")
+
+
+def _parse_order_id(notes: str) -> str | None:
+    m = _ORDER_ID_RE.search(notes or "")
+    return m.group(1) if m else None
+
+
+def confirm_moc_fills() -> dict:
+    """Phase 2 of two-phase MOC execution: resolve PENDING_MOC rows.
+
+    Polls the broker for each pending MOC order placed in phase 1:
+      - filled      -> append an OPEN row at the actual closing-auction price
+                        and add the position to positions.json (now
+                        reconcile-visible, and equal to the backtest's
+                        close-fill assumption).
+      - rejected / canceled / expired -> append a REJECTED row. NO synthetic
+                        fill, NO position — the symbol is simply NO_TRADE
+                        today (per the proposal: a rejected MOC is never
+                        improvised into a fill).
+      - still working -> left untouched; reported as still_pending (phase 2
+                        ran before the 16:00 auction completed).
+
+    Idempotent: an order whose id already has a moc_confirmed / moc_rejected
+    row is skipped, so re-running phase 2 never double-opens a position.
+    """
+    summary: dict = {"confirmed": [], "rejected": [], "still_pending": []}
+    if broker_mode() != "alpaca":
+        return summary
+    from lib import broker
+
+    _ensure_log()
+    with LOG_PATH.open("r", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    last_reset_idx = -1
+    for i, row in enumerate(rows):
+        if _is_reset_row(row):
+            last_reset_idx = i
+    live = rows[last_reset_idx + 1 :] if last_reset_idx >= 0 else rows
+
+    finalized: set[str] = set()
+    for row in live:
+        notes = row.get("notes", "")
+        if "moc_confirmed" in notes or "moc_rejected" in notes:
+            oid = _parse_order_id(notes)
+            if oid:
+                finalized.add(oid)
+
+    pos = _read_positions()
+    for row in live:
+        if row.get("status") != "PENDING_MOC":
+            continue
+        oid = _parse_order_id(row.get("notes", ""))
+        if not oid or oid in finalized:
+            continue
+        symbol = row["symbol"]
+        try:
+            o = broker.get_order(oid)
+        except broker.BrokerError as exc:
+            logger.warning("confirm_moc: get_order failed for %s: %s", oid, exc)
+            summary["still_pending"].append(symbol)
+            continue
+        status = (o.get("status") or "").lower()
+        price = o.get("filled_avg_price")
+        qty = float(row["quantity"])
+        if status == "filled" and price is not None:
+            price = float(price)
+            sl = float(row["stop_loss"]) if row.get("stop_loss") else None
+            tp = float(row["take_profit"]) if row.get("take_profit") else None
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side=row["side"], quantity=qty,
+                simulated_price=round(price, 4),
+                rationale_link=row.get("rationale_link", ""),
+                stop_loss=sl, take_profit=tp,
+                status="OPEN", realized_pnl=0.0,
+                notes=f"moc_confirmed order_id={oid} fill={price:.4f}",
+            )
+            append_fill(fill)
+            pos[symbol] = {
+                "side": row["side"],
+                "quantity": qty,
+                "entry_price": round(price, 4),
+                "entry_ts": fill.timestamp,
+                "stop_loss": sl,
+                "take_profit": tp,
+                "rationale_link": row.get("rationale_link", ""),
+            }
+            finalized.add(oid)
+            summary["confirmed"].append(symbol)
+        elif status in ("rejected", "canceled", "cancelled", "expired"):
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side=row["side"], quantity=qty,
+                simulated_price=0.0,
+                rationale_link=row.get("rationale_link", ""),
+                stop_loss=None, take_profit=None,
+                status="REJECTED", realized_pnl=0.0,
+                notes=f"moc_rejected order_id={oid} status={status} — NO_TRADE",
+            )
+            append_fill(fill)
+            finalized.add(oid)
+            summary["rejected"].append(symbol)
+        else:
+            summary["still_pending"].append(symbol)
+
+    _write_positions(pos)
+    return summary
 
 
 RESET_TOKENS = ("RESET", "MARKER", "_RESET_", "_MARKER_")

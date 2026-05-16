@@ -215,6 +215,25 @@ def submit_market_order(symbol: str, *, qty: float, side: str,
     }
 
 
+def submit_moc_order(symbol: str, *, qty: float, side: str,
+                     client_order_id: str | None = None) -> dict:
+    """Submit a Market-On-Close order.
+
+    Fills in the exchange's official closing auction — the same price the
+    backtest assumes (`lib.backtest` fills at `bars[-1]["close"]`), keeping
+    live paper-mirror results consistent with the validated strategy.
+
+    The exchange requires MOC orders submitted before its cutoff (~15:59 ET;
+    earlier on half-days). Submitting after the cutoff is rejected by the
+    broker — callers must schedule submission before the cutoff and treat a
+    rejection as NO_TRADE for that symbol, never a synthetic fill.
+    """
+    return submit_market_order(
+        symbol, qty=qty, side=side,
+        client_order_id=client_order_id, time_in_force="cls",
+    )
+
+
 def get_order(order_id: str) -> dict:
     """Fetch the latest state of a previously-submitted order.
 
