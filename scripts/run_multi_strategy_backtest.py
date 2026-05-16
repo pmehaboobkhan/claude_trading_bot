@@ -754,6 +754,11 @@ def run_backtest(args) -> dict:
             end_date=end_date,
             initial_capital=cap_b,
             max_position_size_pct=20.0,  # 5 positions = 20% each of strategy B capital
+            # Strategy B's rank-by-return signal needs the exact official close
+            # (per the MOC signal-proxy gate), so it cannot fill at that close.
+            # next_open models realistic execution: decide on close[D], fill at
+            # open[D+1]. A and C keep the default close fill (validated for MOC).
+            fill_timing=getattr(args, "strategy_b_fill", "close"),
         )
     print(f"  done in {time.time() - t0:.1f}s; "
           f"return {result_b.total_return_pct:+.2f}%, trades {len(result_b.trades)}")
@@ -1107,6 +1112,16 @@ def main() -> int:
                              "stress test to measure how much of Strategy B's edge comes "
                              "from selecting today's mega-cap survivors vs the actual "
                              "large-cap basket that existed at each date.")
+    parser.add_argument("--strategy-b-fill", default="close",
+                        choices=["close", "next_open"],
+                        dest="strategy_b_fill",
+                        help="Fill timing for Strategy B only (A/C always fill "
+                             "at the close, validated for MOC). 'close' "
+                             "(default) reproduces the canonical baseline. "
+                             "'next_open' models realistic execution after the "
+                             "MOC signal-proxy gate showed B's ranking needs "
+                             "the exact close: decide on close[D], fill at "
+                             "open[D+1].")
     parser.add_argument("--label", default="",
                         help="Optional tag included in the report filename")
     parser.add_argument("--no-report", dest="write_report", action="store_false",
