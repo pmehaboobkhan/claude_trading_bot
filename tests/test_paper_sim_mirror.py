@@ -77,28 +77,84 @@ def test_open_position_alpaca_mode_calls_broker_and_uses_broker_price(monkeypatc
             rationale_link="decisions/2026-05-14/test.json",
             stop_loss=90.0, take_profit=120.0,
         )
-    # Log should reflect the broker fill price, not the sim price
+    # Log row reflects the broker fill price + slippage (audit trail)
     assert fill.simulated_price == round(broker_fill, 4)
-    # Notes should include slippage vs sim
     assert "broker_fill=100.0500" in fill.notes
-    assert "slippage_vs_sim=" in fill.notes
     assert "order_id=ord_X" in fill.notes
+    # Alpaca is the source of truth — open_position must NOT write positions.json
+    # in alpaca mode (the reconcile mirror owns it).
+    assert paper_sim._read_positions() == {}
 
 
-def test_open_position_alpaca_mode_falls_back_to_sim_on_failure(monkeypatch, isolated_dir):
-    """If broker submit fails (returns None), use the sim price + log the failure."""
+def test_open_position_alpaca_mode_pending_records_no_sim_fallback(monkeypatch, isolated_dir):
+    """The real Monday case: order submitted at 16:30 is accepted but does NOT
+    fill in the poll window (market closed; fills next open). It must NOT fall
+    back to a synthetic sim price and must NOT write positions.json — it
+    records a PENDING_BROKER breadcrumb. Alpaca will fill it next open and the
+    reconcile mirror will pick it up."""
     monkeypatch.setenv("BROKER_PAPER", "alpaca")
     with patch.object(paper_sim, "_alpaca_submit_and_wait",
-                      return_value=(None, {"error": "rejected"})):
+                      return_value=(None, {"id": "ord_P", "status": "accepted"})):
         fill = paper_sim.open_position(
             symbol="SPY", side="BUY", quantity=10, quote_price=100.0,
-            rationale_link="decisions/2026-05-14/test.json",
+            rationale_link="decisions/2026-05-18/eod_SPY.json",
             stop_loss=90.0, take_profit=120.0,
         )
-    # Sim price = 100.0 + 1bp slippage + 1bp half-spread = 100.02
-    assert 100.0 < fill.simulated_price < 100.05  # close to sim price, not 100 exactly
-    assert "broker_submit_failed" in fill.notes
-    assert "fell back to sim price" in fill.notes
+    assert fill.status == "PENDING_BROKER"
+    assert "order_id=ord_P" in fill.notes
+    assert "fell back to sim price" not in fill.notes
+    assert paper_sim._read_positions() == {}
+
+
+def test_sync_positions_from_broker_mirrors_alpaca(monkeypatch, isolated_dir):
+    """positions.json becomes an exact mirror of Alpaca's actual positions
+    (long-only → side BUY; entry = avg_entry_price)."""
+    import lib.broker as real_broker
+    monkeypatch.setenv("BROKER_PAPER", "alpaca")
+    monkeypatch.setattr(real_broker, "get_positions", lambda: [
+        {"symbol": "SPY", "qty": 12.0, "avg_entry_price": 501.25,
+         "market_value": 6100.0, "unrealized_pl": 85.0},
+        {"symbol": "GLD", "qty": 4.0, "avg_entry_price": 210.0,
+         "market_value": 850.0, "unrealized_pl": 10.0},
+    ])
+    n = paper_sim.sync_positions_from_broker()
+    pos = paper_sim._read_positions()
+    assert n == 2
+    assert pos["SPY"]["quantity"] == 12.0
+    assert pos["SPY"]["entry_price"] == 501.25
+    assert pos["SPY"]["side"] == "BUY"
+    assert set(pos) == {"SPY", "GLD"}
+
+
+def test_reconcile_alpaca_mode_mirrors_broker_no_divergence(monkeypatch, isolated_dir):
+    """In alpaca mode reconcile() syncs positions.json FROM Alpaca and reports
+    no divergence — Alpaca is authoritative, so step 8a's compare trivially
+    passes and the routine never false-halts on an in-flight order."""
+    import lib.broker as real_broker
+    monkeypatch.setenv("BROKER_PAPER", "alpaca")
+    # local stale/empty; Alpaca has the real (next-open-filled) position
+    monkeypatch.setattr(real_broker, "get_positions", lambda: [
+        {"symbol": "SPY", "qty": 10.0, "avg_entry_price": 500.0,
+         "market_value": 5000.0, "unrealized_pl": 0.0}])
+    rec = paper_sim.reconcile()
+    assert rec["discrepancies"] == []
+    assert rec["open_count"] == 1
+    assert paper_sim._read_positions()["SPY"]["quantity"] == 10.0
+
+
+def test_reconcile_sim_mode_unchanged(monkeypatch, isolated_dir):
+    """Regression guard: sim mode reconcile() keeps the log-vs-positions
+    behavior and never calls the broker."""
+    monkeypatch.delenv("BROKER_PAPER", raising=False)
+    with patch.object(paper_sim, "sync_positions_from_broker") as mocked:
+        paper_sim.open_position(
+            symbol="SPY", side="BUY", quantity=5, quote_price=100.0,
+            rationale_link="decisions/2026-05-18/s.json",
+            stop_loss=90.0, take_profit=120.0)
+        rec = paper_sim.reconcile()
+    mocked.assert_not_called()
+    assert rec["open_count"] == 1
+    assert rec["discrepancies"] == []
 
 
 def test_close_position_alpaca_mode_uses_opposite_side(monkeypatch, isolated_dir):
@@ -167,6 +223,10 @@ def test_confirm_moc_fills_finalizes_filled_order(monkeypatch, isolated_dir):
     pos = paper_sim._read_positions()
     assert pos["SPY"]["quantity"] == 10
     assert pos["SPY"]["entry_price"] == 101.25
+    # reconcile() is now Alpaca-authoritative: it mirrors the broker account.
+    monkeypatch.setattr(real_broker, "get_positions", lambda: [
+        {"symbol": "SPY", "qty": 10.0, "avg_entry_price": 101.25,
+         "market_value": 1012.5, "unrealized_pl": 0.0}])
     rec = paper_sim.reconcile()
     assert rec["open_count"] == 1
     assert rec["discrepancies"] == []
@@ -183,6 +243,7 @@ def test_confirm_moc_fills_rejected_order_is_no_trade(monkeypatch, isolated_dir)
 
     assert "GLD" in summary["rejected"]
     assert paper_sim._read_positions() == {}
+    monkeypatch.setattr(real_broker, "get_positions", lambda: [])
     rec = paper_sim.reconcile()
     assert rec["open_count"] == 0
     assert rec["discrepancies"] == []
@@ -216,6 +277,9 @@ def test_confirm_moc_fills_is_idempotent(monkeypatch, isolated_dir):
 
     assert first["confirmed"] == ["SPY"]
     assert second["confirmed"] == []  # already finalized — not re-confirmed
+    monkeypatch.setattr(real_broker, "get_positions", lambda: [
+        {"symbol": "SPY", "qty": 10.0, "avg_entry_price": 101.25,
+         "market_value": 1012.5, "unrealized_pl": 0.0}])
     rec = paper_sim.reconcile()
     assert rec["open_count"] == 1
     assert rec["discrepancies"] == []

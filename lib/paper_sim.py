@@ -173,37 +173,55 @@ def open_position(*, symbol: str, side: str, quantity: float, quote_price: float
     sim_price = simulated_fill_price(side=side, quote_price=quote_price, model=fill_model)
     fee = commission(model=fill_model)
 
-    # Optional Alpaca-mirror submission. Returns broker fill price or None on failure.
-    broker_fill_price: float | None = None
-    broker_note = ""
     if broker_mode() == "alpaca":
+        # Alpaca is the source of truth. Submit + journal only — NEVER
+        # synthesize a fill or write positions.json (the reconcile mirror
+        # owns it). A decision made at 16:30 ET can't fill until next open;
+        # faking a close-price fill here was the cause of the daily
+        # false-divergence halt.
         coid = _client_order_id(rationale_link, "open")
         broker_fill_price, last_ack = _alpaca_submit_and_wait(
             symbol=symbol, qty=quantity, side=side, client_order_id=coid,
         )
         if broker_fill_price is not None:
-            slippage_vs_sim = broker_fill_price - sim_price
-            broker_note = (f"; broker_fill={broker_fill_price:.4f}"
-                           f" slippage_vs_sim={slippage_vs_sim:+.4f}"
-                           f" order_id={last_ack.get('id', '?')}")
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side=side, quantity=quantity,
+                simulated_price=round(broker_fill_price, 4),
+                rationale_link=rationale_link,
+                stop_loss=stop_loss, take_profit=take_profit,
+                status="OPEN", realized_pnl=round(-fee, 2),
+                notes=notes + (f"; broker_fill={broker_fill_price:.4f}"
+                               f" slippage_vs_sim={broker_fill_price - sim_price:+.4f}"
+                               f" order_id={last_ack.get('id', '?')}"),
+            )
         else:
-            broker_note = (f"; broker_submit_failed status={last_ack.get('status', 'error')}"
-                           f" — fell back to sim price")
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side=side, quantity=quantity,
+                simulated_price=0.0,
+                rationale_link=rationale_link,
+                stop_loss=stop_loss, take_profit=take_profit,
+                status="PENDING_BROKER", realized_pnl=0.0,
+                notes=notes + (f"; broker_pending order_id={last_ack.get('id', '?')}"
+                               f" status={last_ack.get('status', last_ack.get('error', '?'))}"),
+            )
+        append_fill(fill)
+        return fill
 
-    # Use broker fill price if available, else the simulated price.
-    fill_price = broker_fill_price if broker_fill_price is not None else sim_price
+    # --- sim mode (unchanged): synthetic fill is the source of truth ---
     fill = PaperFill(
         timestamp=datetime.now(UTC).isoformat(),
         symbol=symbol,
         side=side,
         quantity=quantity,
-        simulated_price=round(fill_price, 4),
+        simulated_price=round(sim_price, 4),
         rationale_link=rationale_link,
         stop_loss=stop_loss,
         take_profit=take_profit,
         status="OPEN",
         realized_pnl=round(-fee, 2),  # fee booked at entry
-        notes=notes + broker_note,
+        notes=notes,
     )
     append_fill(fill)
     pos = _read_positions()
@@ -238,36 +256,55 @@ def close_position(symbol: str, *, quote_price: float, rationale_link: str,
 
     # Closing side is the opposite of the original side.
     close_side = "SELL" if p["side"] == "BUY" else "BUY"
-    broker_fill_price: float | None = None
-    broker_note = ""
+
     if broker_mode() == "alpaca":
+        # Submit + journal only; the reconcile mirror owns positions.json.
+        # Once Alpaca fills the close (next open) the mirror drops the
+        # position. No synthetic fill, no local position rewrite.
         coid = _client_order_id(rationale_link, "close")
         broker_fill_price, last_ack = _alpaca_submit_and_wait(
             symbol=symbol, qty=p["quantity"], side=close_side, client_order_id=coid,
         )
         if broker_fill_price is not None:
-            slippage_vs_sim = broker_fill_price - sim_price
-            broker_note = (f"; broker_close={broker_fill_price:.4f}"
-                           f" slippage_vs_sim={slippage_vs_sim:+.4f}"
-                           f" order_id={last_ack.get('id', '?')}")
+            pnl = (broker_fill_price - p["entry_price"]) * p["quantity"] * (
+                1 if p["side"] == "BUY" else -1) - fee
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side="CLOSE", quantity=p["quantity"],
+                simulated_price=round(broker_fill_price, 4),
+                rationale_link=rationale_link, stop_loss=None, take_profit=None,
+                status="CLOSED", realized_pnl=round(pnl, 2),
+                notes=notes + (f"; broker_close={broker_fill_price:.4f}"
+                               f" slippage_vs_sim={broker_fill_price - sim_price:+.4f}"
+                               f" order_id={last_ack.get('id', '?')}"),
+            )
         else:
-            broker_note = (f"; broker_close_failed status={last_ack.get('status', 'error')}"
-                           f" — fell back to sim price")
+            fill = PaperFill(
+                timestamp=datetime.now(UTC).isoformat(),
+                symbol=symbol, side="CLOSE", quantity=p["quantity"],
+                simulated_price=0.0,
+                rationale_link=rationale_link, stop_loss=None, take_profit=None,
+                status="PENDING_BROKER", realized_pnl=0.0,
+                notes=notes + (f"; broker_close_pending order_id={last_ack.get('id', '?')}"
+                               f" status={last_ack.get('status', last_ack.get('error', '?'))}"),
+            )
+        append_fill(fill)
+        return fill
 
-    fill_price = broker_fill_price if broker_fill_price is not None else sim_price
-    pnl = (fill_price - p["entry_price"]) * p["quantity"] * (1 if p["side"] == "BUY" else -1) - fee
+    # --- sim mode (unchanged) ---
+    pnl = (sim_price - p["entry_price"]) * p["quantity"] * (1 if p["side"] == "BUY" else -1) - fee
     fill = PaperFill(
         timestamp=datetime.now(UTC).isoformat(),
         symbol=symbol,
         side="CLOSE",
         quantity=p["quantity"],
-        simulated_price=round(fill_price, 4),
+        simulated_price=round(sim_price, 4),
         rationale_link=rationale_link,
         stop_loss=None,
         take_profit=None,
         status="CLOSED",
         realized_pnl=round(pnl, 2),
-        notes=notes + broker_note,
+        notes=notes,
     )
     append_fill(fill)
     _write_positions(pos)
@@ -435,6 +472,30 @@ def _is_reset_row(row: dict) -> bool:
     return False
 
 
+def sync_positions_from_broker() -> int:
+    """Overwrite positions.json to mirror Alpaca's actual open positions.
+
+    In alpaca mode the broker account is the single source of truth — local
+    state is a read-through mirror, never synthesized. The system is long-only
+    (CLAUDE.md), so every mirrored position is side BUY. Returns the count.
+    """
+    from lib import broker
+    mirrored = {
+        p["symbol"]: {
+            "side": "BUY",
+            "quantity": float(p["qty"]),
+            "entry_price": round(float(p["avg_entry_price"]), 4),
+            "entry_ts": datetime.now(UTC).isoformat(),
+            "stop_loss": None,
+            "take_profit": None,
+            "rationale_link": "alpaca-mirror",
+        }
+        for p in broker.get_positions()
+    }
+    _write_positions(mirrored)
+    return len(mirrored)
+
+
 def reconcile() -> dict:
     """Recompute open positions from log.csv and verify it matches positions.json.
 
@@ -445,7 +506,16 @@ def reconcile() -> dict:
     everything above that line is closed at the broker side and ``positions.json``
     is overwritten to ``{}``. We only consider rows AFTER the latest reset
     marker — pre-reset OPENs are stale, not divergence.
+
+    In **alpaca mode** the broker account is authoritative: positions.json is
+    re-mirrored from Alpaca and there is no log-vs-local compare (log.csv is
+    the submission journal, not the source of truth). This makes the EOD
+    reconciliation self-healing — an order still in flight to the next open is
+    simply "not a position yet", never a divergence to halt on.
     """
+    if broker_mode() == "alpaca":
+        n = sync_positions_from_broker()
+        return {"open_count": n, "discrepancies": [], "source": "alpaca-authoritative"}
     _ensure_log()
     open_from_log: dict[str, dict] = {}
     with LOG_PATH.open("r", encoding="utf-8") as f:
