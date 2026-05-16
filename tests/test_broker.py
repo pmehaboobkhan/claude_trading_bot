@@ -97,6 +97,54 @@ def test_submit_market_order_refused_in_halted_mode(monkeypatch):
         broker.submit_market_order("SPY", qty=10, side="BUY")
 
 
+# ---- submit_moc_order (Market-On-Close) ---------------------------------
+
+
+def test_submit_moc_order_uses_cls_time_in_force(monkeypatch):
+    """A Market-On-Close order must be built with TimeInForce.CLS so it fills
+    in the official closing auction (the price the backtest assumes)."""
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, *a, **kw): pass
+        def submit_order(self, *, order_data):
+            captured["order_data"] = order_data
+            return _fake_order(status="accepted")
+
+    fake_alpaca_client = type(sys)("alpaca.trading.client")
+    fake_alpaca_client.TradingClient = FakeClient
+    fake_alpaca_enums = type(sys)("alpaca.trading.enums")
+    fake_alpaca_enums.OrderSide = SimpleNamespace(BUY="BUY", SELL="SELL")
+    fake_alpaca_enums.TimeInForce = SimpleNamespace(DAY="day", CLS="cls")
+    fake_alpaca_requests = type(sys)("alpaca.trading.requests")
+    fake_alpaca_requests.MarketOrderRequest = lambda **kw: SimpleNamespace(**kw)
+    monkeypatch.setitem(sys.modules, "alpaca.trading.client", fake_alpaca_client)
+    monkeypatch.setitem(sys.modules, "alpaca.trading.enums", fake_alpaca_enums)
+    monkeypatch.setitem(sys.modules, "alpaca.trading.requests", fake_alpaca_requests)
+    monkeypatch.setattr(broker, "current_mode", lambda: "PAPER_TRADING")
+
+    result = broker.submit_moc_order(
+        "SPY", qty=10, side="BUY", client_order_id="dec_moc_1"
+    )
+    assert captured["order_data"].time_in_force == "cls"
+    assert captured["order_data"].symbol == "SPY"
+    assert result["id"] == "ord_123"
+    assert result["client_order_id"] == "dec_456"
+    assert result["is_paper"] is True
+
+
+def test_submit_moc_order_rejects_invalid_side(monkeypatch):
+    monkeypatch.setattr(broker, "current_mode", lambda: "PAPER_TRADING")
+    with pytest.raises(broker.BrokerError, match="invalid side"):
+        broker.submit_moc_order("SPY", qty=10, side="HOLD")
+
+
+def test_submit_moc_order_refused_in_halted_mode(monkeypatch):
+    monkeypatch.setattr(broker, "current_mode", lambda: "HALTED")
+    with pytest.raises(broker.BrokerError, match="broker access refused"):
+        broker.submit_moc_order("SPY", qty=10, side="BUY")
+
+
 # ---- get_order ----------------------------------------------------------
 
 

@@ -135,6 +135,138 @@ def test_close_position_alpaca_mode_uses_opposite_side(monkeypatch, isolated_dir
     assert "broker_close=102.5000" in close_fill.notes
 
 
+def _stage_pending_moc(monkeypatch, *, order_id="ord_A", symbol="SPY",
+                       side="BUY", qty=10):
+    """Helper: put one PENDING_MOC row in the log via submit_moc_entry."""
+    monkeypatch.setenv("BROKER_PAPER", "alpaca")
+    import lib.broker as real_broker
+    monkeypatch.setattr(
+        real_broker, "submit_moc_order",
+        lambda s, *, qty, side, client_order_id=None: {
+            "id": order_id, "status": "accepted", "is_paper": True},
+    )
+    return paper_sim.submit_moc_entry(
+        symbol=symbol, side=side, quantity=qty,
+        rationale_link=f"decisions/2026-05-18/1550_{symbol}.json",
+        stop_loss=90.0, take_profit=120.0,
+    )
+
+
+def test_confirm_moc_fills_finalizes_filled_order(monkeypatch, isolated_dir):
+    """Phase 2: a filled MOC becomes an OPEN position at the auction price,
+    positions.json reflects it, and reconcile() shows no divergence."""
+    _stage_pending_moc(monkeypatch, order_id="ord_A", symbol="SPY", qty=10)
+    import lib.broker as real_broker
+    monkeypatch.setattr(real_broker, "get_order", lambda oid: {
+        "id": oid, "status": "filled", "filled_avg_price": 101.25,
+        "filled_qty": 10.0})
+
+    summary = paper_sim.confirm_moc_fills()
+
+    assert "SPY" in summary["confirmed"]
+    pos = paper_sim._read_positions()
+    assert pos["SPY"]["quantity"] == 10
+    assert pos["SPY"]["entry_price"] == 101.25
+    rec = paper_sim.reconcile()
+    assert rec["open_count"] == 1
+    assert rec["discrepancies"] == []
+
+
+def test_confirm_moc_fills_rejected_order_is_no_trade(monkeypatch, isolated_dir):
+    """A rejected MOC must NOT become a synthetic fill — it's NO_TRADE."""
+    _stage_pending_moc(monkeypatch, order_id="ord_R", symbol="GLD", qty=5)
+    import lib.broker as real_broker
+    monkeypatch.setattr(real_broker, "get_order", lambda oid: {
+        "id": oid, "status": "rejected", "filled_avg_price": None})
+
+    summary = paper_sim.confirm_moc_fills()
+
+    assert "GLD" in summary["rejected"]
+    assert paper_sim._read_positions() == {}
+    rec = paper_sim.reconcile()
+    assert rec["open_count"] == 0
+    assert rec["discrepancies"] == []
+
+
+def test_confirm_moc_fills_leaves_unfilled_order_pending(monkeypatch, isolated_dir):
+    """Called before the auction completes: order still accepted, not filled.
+    Must not finalize — no OPEN, no REJECTED, position not created."""
+    _stage_pending_moc(monkeypatch, order_id="ord_P", symbol="TLT", qty=7)
+    import lib.broker as real_broker
+    monkeypatch.setattr(real_broker, "get_order", lambda oid: {
+        "id": oid, "status": "accepted", "filled_avg_price": None})
+
+    summary = paper_sim.confirm_moc_fills()
+
+    assert summary["still_pending"] == ["TLT"]
+    assert summary["confirmed"] == [] and summary["rejected"] == []
+    assert paper_sim._read_positions() == {}
+
+
+def test_confirm_moc_fills_is_idempotent(monkeypatch, isolated_dir):
+    """Re-running phase 2 after a fill must not double-open the position."""
+    _stage_pending_moc(monkeypatch, order_id="ord_A", symbol="SPY", qty=10)
+    import lib.broker as real_broker
+    monkeypatch.setattr(real_broker, "get_order", lambda oid: {
+        "id": oid, "status": "filled", "filled_avg_price": 101.25,
+        "filled_qty": 10.0})
+
+    first = paper_sim.confirm_moc_fills()
+    second = paper_sim.confirm_moc_fills()
+
+    assert first["confirmed"] == ["SPY"]
+    assert second["confirmed"] == []  # already finalized — not re-confirmed
+    rec = paper_sim.reconcile()
+    assert rec["open_count"] == 1
+    assert rec["discrepancies"] == []
+
+
+# ---- Phase-1 MOC submission (submit_moc_entry) --------------------------
+
+
+def test_submit_moc_entry_writes_pending_row_without_polling(monkeypatch, isolated_dir):
+    """Phase 1: submit an MOC entry. Must NOT poll for a fill (MOC fills at
+    16:00, not now), MUST NOT touch positions.json, and records a
+    PENDING_MOC breadcrumb row with the broker order id."""
+    monkeypatch.setenv("BROKER_PAPER", "alpaca")
+    import lib.broker as real_broker
+    calls = {}
+
+    def fake_moc(symbol, *, qty, side, client_order_id=None):
+        calls["args"] = (symbol, qty, side, client_order_id)
+        return {"id": "ord_moc_1", "status": "accepted", "is_paper": True}
+
+    monkeypatch.setattr(real_broker, "submit_moc_order", fake_moc)
+    # If the code ever falls back to the 5s poll path, this blows up the test.
+    with patch.object(paper_sim, "_alpaca_submit_and_wait",
+                      side_effect=AssertionError("MOC must not poll in phase 1")):
+        fill = paper_sim.submit_moc_entry(
+            symbol="SPY", side="BUY", quantity=10,
+            rationale_link="decisions/2026-05-18/1550_SPY.json",
+            stop_loss=90.0, take_profit=120.0,
+        )
+
+    assert fill.status == "PENDING_MOC"
+    assert calls["args"][0] == "SPY"
+    assert calls["args"][1] == 10
+    assert calls["args"][2] == "BUY"
+    assert "ord_moc_1" in fill.notes
+    # positions.json must remain empty — the position is not confirmed yet.
+    assert paper_sim._read_positions() == {}
+
+
+def test_submit_moc_entry_requires_alpaca_mode(monkeypatch, isolated_dir):
+    """In sim mode the two-phase MOC flow does not apply (sim fills at the
+    close via open_position). Calling submit_moc_entry must fail loudly."""
+    monkeypatch.delenv("BROKER_PAPER", raising=False)
+    with pytest.raises(ValueError, match="requires BROKER_PAPER=alpaca"):
+        paper_sim.submit_moc_entry(
+            symbol="SPY", side="BUY", quantity=10,
+            rationale_link="decisions/2026-05-18/1550_SPY.json",
+            stop_loss=90.0, take_profit=120.0,
+        )
+
+
 def test_alpaca_submit_and_wait_returns_none_on_broker_error(monkeypatch):
     """Broker exceptions during submit must be swallowed (return None, not raise)."""
     fake_broker = type(sys)("broker")
