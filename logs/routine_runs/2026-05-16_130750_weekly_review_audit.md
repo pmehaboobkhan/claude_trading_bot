@@ -38,8 +38,11 @@ files_read:
   bytes: 3004
 - path: logs/routine_runs/2026-05-15_190750_weekly_review_audit.md
   bytes: 1720
-artifacts_written: []
-commits: []
+artifacts_written:
+- logs/routine_runs/2026-05-16_130750_start.md
+- logs/routine_runs/2026-05-16_130750_weekly_review_audit.md
+commits:
+- 44924b1
 notes: "Saturday-scheduled weekly review for 2026-W20; prior run (2026-05-15T19:07Z,\
   \ commit fd72c8c) produced all artifacts \u2014 journal, learning-review, strategy-lessons,\
   \ digest. Today: compliance_safety gate re-run \u2192 APPROVED; Telegram delivery;\
