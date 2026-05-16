@@ -106,6 +106,26 @@ def _annualized_sharpe(rets: list[float], periods_per_year: int = 252) -> float:
 # Backtest runner
 # ---------------------------------------------------------------------------
 
+def _fill_quote(full_bars: list[dict], i: int, *, fill_timing: str = "close") -> float:
+    """Quote price used to fill a trade decided on bar ``i``.
+
+    - ``"close"`` (default): bar ``i``'s close — the historical behaviour the
+      canonical 8-10%/Sharpe validation depends on. Bit-for-bit unchanged.
+    - ``"next_open"``: bar ``i+1``'s open. Models realistic execution for
+      strategies whose ranking needs the exact official close (so they cannot
+      fill at that close): decide on close[i], fill at open[i+1]. With no next
+      bar (end of data) it falls back to close[i] — no invented lookahead.
+    """
+    if fill_timing == "close":
+        return float(full_bars[i]["close"])
+    if fill_timing == "next_open":
+        if i + 1 < len(full_bars):
+            return float(full_bars[i + 1]["open"])
+        return float(full_bars[i]["close"])
+    raise ValueError(
+        f"unknown fill_timing {fill_timing!r}; expected 'close' or 'next_open'")
+
+
 def run_backtest(*, strategy: str,
                  bars_by_symbol: dict[str, list[dict]],
                  watchlist_symbols: list[str],
@@ -115,7 +135,8 @@ def run_backtest(*, strategy: str,
                  initial_capital: float = 100_000.0,
                  max_position_size_pct: float = 25.0,
                  fill_model: FillModel | None = None,
-                 strategy_params: dict[str, dict] | None = None) -> BacktestResult:
+                 strategy_params: dict[str, dict] | None = None,
+                 fill_timing: str = "close") -> BacktestResult:
     """Run an event-driven backtest of a single named strategy.
 
     `bars_by_symbol` must contain bars for SPY, all watchlist symbols, and (optionally)
@@ -166,8 +187,7 @@ def run_backtest(*, strategy: str,
         for sig in my_signals:
             if sig.action == "EXIT" and sig.symbol in positions:
                 p = positions.pop(sig.symbol)
-                bars_for_sym = slice_by_symbol[sig.symbol]
-                quote = float(bars_for_sym[-1]["close"])
+                quote = _fill_quote(bars_by_symbol[sig.symbol], i, fill_timing=fill_timing)
                 fill_price = simulated_fill_price(side="CLOSE", quote_price=quote, model=fm)
                 proceeds = p.quantity * fill_price
                 cash += proceeds
@@ -181,8 +201,7 @@ def run_backtest(*, strategy: str,
         # Then ENTRYs.
         for sig in my_signals:
             if sig.action == "ENTRY" and sig.symbol not in positions and sig.symbol in slice_by_symbol:
-                bars_for_sym = slice_by_symbol[sig.symbol]
-                quote = float(bars_for_sym[-1]["close"])
+                quote = _fill_quote(bars_by_symbol[sig.symbol], i, fill_timing=fill_timing)
                 fill_price = simulated_fill_price(side="BUY", quote_price=quote, model=fm)
                 # Equity now (cash + value of any still-open positions).
                 equity_now = cash + sum(
@@ -212,10 +231,8 @@ def run_backtest(*, strategy: str,
 
     # Close any open positions at the final close.
     final_date = dates[end_idx - 1]
-    final_slice = {sym: bars[: end_idx] for sym, bars in bars_by_symbol.items()
-                   if end_idx <= len(bars)}
     for sym, p in list(positions.items()):
-        quote = float(final_slice[sym][-1]["close"])
+        quote = _fill_quote(bars_by_symbol[sym], end_idx - 1, fill_timing=fill_timing)
         fill_price = simulated_fill_price(side="CLOSE", quote_price=quote, model=fm)
         cash += p.quantity * fill_price
         trades.append({
